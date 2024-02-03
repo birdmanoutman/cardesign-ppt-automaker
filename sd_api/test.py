@@ -4,7 +4,7 @@ import io
 import base64
 from PIL import Image, PngImagePlugin
 
-url = "http://124.221.249.173:41430"
+# url = "http://124.221.249.173:41430"
 #
 # payload = {
 #     "prompt": "puppy dog, cute, nice",
