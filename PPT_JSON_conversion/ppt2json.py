@@ -4,7 +4,10 @@ from pptx import Presentation
 from PIL import Image as PILImage
 import io
 from wand.image import Image as WandImage
-from pptx.util import Inches
+from pptx.enum.dml import MSO_FILL_TYPE, MSO_COLOR_TYPE
+from pptx.enum.shapes import MSO_SHAPE_TYPE
+from pptx.shapes.graphfrm import GraphicFrame
+
 
 
 def convert_wmf_to_png(wmf_path, output_path):
@@ -36,17 +39,19 @@ def save_image(image, slide_index, image_index, output_dir="images"):
         return image_path
 
 
-def extract_text(shape):
+def extract_text(shape, shape_index):
     """
     从PPT元素中提取文本及其属性。
     """
     text_details = {
         "type": "text",
+        "z_index": shape_index,
         "content": shape.text,
         "left": shape.left.pt,
         "top": shape.top.pt,
         "width": shape.width.pt,
-        "height": shape.height.pt
+        "height": shape.height.pt,
+        # 可以添加更多文本特定的属性，如字体大小、颜色等
     }
 
     if shape.has_text_frame and shape.text_frame.paragraphs:
@@ -69,16 +74,51 @@ def extract_text(shape):
     return text_details
 
 
-def extract_shape(element):
-    """
-    提取形状信息。
-    """
-    # 这里可以根据需要扩展，提取形状的详细信息
-    shape_info = {
+def extract_shape(shape, shape_index):
+    shape_details = {
         "type": "shape",
-        "shape_type": element.shape_type
+        "z_index": shape_index,
+        "left": shape.left.pt,
+        "top": shape.top.pt,
+        "width": shape.width.pt,
+        "height": shape.height.pt,
     }
-    return shape_info
+
+    # 检查形状是否支持填充属性，并记录填充颜色
+    if hasattr(shape, 'fill') and shape.fill.type == MSO_FILL_TYPE.SOLID:
+        shape_details['fill_color'] = shape.fill.fore_color.rgb if shape.fill.fore_color.type == MSO_COLOR_TYPE.RGB else None
+
+    # 检查形状是否有线条属性，并记录边框颜色和粗细
+    if hasattr(shape, 'line') and shape.line.color.type == MSO_COLOR_TYPE.RGB:
+        shape_details['line_color'] = shape.line.color.rgb
+        shape_details['line_width'] = shape.line.width.pt
+
+    # 记录阴影效果（如果有）
+    # 仅在形状支持阴影属性时尝试访问
+    if not isinstance(shape, GraphicFrame) and hasattr(shape, 'shadow'):
+        try:
+            if not shape.shadow.inherit:
+                shape_details['shadow'] = {
+                    "effect": shape.shadow.effect,
+                    "angle": shape.shadow.angle,
+                    "distance": shape.shadow.distance.pt,
+                }
+        except NotImplementedError:
+            # 对于不支持阴影属性的形状，可以在这里处理异常
+            pass
+
+
+    # 根据形状类型处理特定属性
+    if shape.shape_type == MSO_SHAPE_TYPE.AUTO_SHAPE:
+        shape_details['auto_shape_type'] = shape.auto_shape_type
+    elif shape.shape_type == MSO_SHAPE_TYPE.PICTURE:
+        # 特殊处理图片类型
+        shape_details['picture'] = "Special handling for pictures might be required here."
+    # 为其他特定形状类型添加更多的条件分支
+
+    return shape_details
+
+
 def extract_images(slide, slide_index, output_dir):
     images = []
     for shape_index, shape in enumerate(slide.shapes):
@@ -111,6 +151,7 @@ def extract_images(slide, slide_index, output_dir):
 
                     images.append({
                         "type": "image",
+                        "z_index": shape_index,  # 添加z_index属性
                         "path": image_path,
                         "left": left,
                         "top": top,
@@ -123,11 +164,7 @@ def extract_images(slide, slide_index, output_dir):
 
 
 # 确保之前定义的extract_images和extract_shape函数适当地处理了图片和形状
-
 def pptx_to_json(pptx_path, json_path, images_dir="images"):
-    """
-    将PPTX文件转换为JSON格式，包括过渡效果、动画和详细的形状信息等。
-    """
     presentation = Presentation(pptx_path)
     presentation_data = {
         "presentation": {
@@ -142,15 +179,18 @@ def pptx_to_json(pptx_path, json_path, images_dir="images"):
             "elements": []
         }
 
-        # 处理图片和形状
-        for shape in slide.shapes:
-            if shape.shape_type == 13:  # 图片类型
-                slide_data["elements"].extend(extract_images(slide, slide_index, images_dir))
-            elif shape.has_text_frame:
-                text_details = extract_text(shape)
+        # 直接为每个幻灯片调用extract_images
+        images = extract_images(slide, slide_index, images_dir)
+        slide_data["elements"].extend(images)  # 将图片添加到元素列表中
+
+        for shape_index, shape in enumerate(slide.shapes):
+            if shape.has_text_frame:
+                text_details = extract_text(shape, shape_index)
+                text_details["z_index"] = shape_index  # 添加 z_index
                 slide_data["elements"].append(text_details)
-            else:  # 其他形状类型，如纯形状等
-                shape_info = extract_shape(shape)  # 确保这个函数能够提取形状的详细信息
+            elif not shape.shape_type == MSO_SHAPE_TYPE.PICTURE:  # 排除图片类型，因为它们已被处理
+                shape_info = extract_shape(shape, shape_index)
+                shape_info["z_index"] = shape_index  # 添加 z_index
                 slide_data["elements"].append(shape_info)
 
         presentation_data["presentation"]["slides"].append(slide_data)
