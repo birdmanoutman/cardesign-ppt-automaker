@@ -87,10 +87,11 @@ def extract_images(slide, slide_index, output_dir):
             try:
                 with PILImage.open(image_bytes) as img:
                     # 计算图片的位置和尺寸
-                    left = Inches(shape.left).inches
-                    top = Inches(shape.top).inches
-                    width = Inches(shape.width).inches
-                    height = Inches(shape.height).inches
+                    left = shape.left.pt
+                    top = shape.top.pt
+                    width = shape.width.pt
+                    height = shape.height.pt
+                    print('图片宽：{},高:{}'.format(width, height))
 
                     if img.format == 'WMF':
                         # 创建临时 WMF 文件
