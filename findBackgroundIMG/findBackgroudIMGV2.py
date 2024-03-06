@@ -9,6 +9,10 @@ import imagehash
 import pandas as pd
 
 
+# 设置日志
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+
 def get_unique_hashes(csv_path):
     """使用pandas读取CSV文件，并返回所有'Is Duplicate'为0的图片hash的集合。"""
     if os.path.exists(csv_path):
@@ -44,10 +48,6 @@ def mark_and_remove_duplicates_in_csv(file_path):
             print(f"File not found, skipped: {file_path}")
 
 
-# 设置日志
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
-
 def get_image_format(image_blob):
     """根据图片的二进制数据猜测图片格式。"""
     try:
@@ -70,7 +70,7 @@ def save_image(image, slide_idx, shape_idx, pptx_filename, dest_folder, csv_writ
     try:
         image_bytes = io.BytesIO(image.blob)
         img = Image.open(image_bytes)
-        img_hash = imagehash.average_hash(img)
+        img_hash = str(imagehash.average_hash(img))
 
         img_format = get_image_format(image.blob) or 'png'
         file_extension = 'jpg' if img_format == 'jpeg' else img_format
@@ -81,12 +81,12 @@ def save_image(image, slide_idx, shape_idx, pptx_filename, dest_folder, csv_writ
         if img_hash in existing_hashes:
 
             logging.info(f"重复图片: {img_path}")
+            csv_writer.writerow([pptx_filename, img_path, img_hash])
 
         else:
             img.save(img_path)
             logging.info(f"保存图片: {img_path}")
-
-        csv_writer.writerow([pptx_filename, img_path, img_hash])
+            csv_writer.writerow([pptx_filename, img_path, img_hash])
 
     except UnidentifiedImageError:
         logging.error(f"UnidentifiedImageError: Cannot identify image file in {pptx_filename}, slide {slide_idx+1}, shape {shape_idx+1}.")
@@ -118,7 +118,7 @@ def main(src_folder, dest_folder, csv_file_path):
         os.makedirs(dest_folder)
     try:
         existing_hashes = get_unique_hashes(csv_file_path)
-
+        print(existing_hashes)
     except:
         existing_hashes = None
 
