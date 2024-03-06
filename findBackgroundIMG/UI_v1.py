@@ -1,10 +1,19 @@
-import csv
-import os
 import tkinter as tk
 from tkinter import ttk
 from PIL import Image, ImageTk
+import csv
+import os
 import subprocess
 import platform
+from PIL import Image, __version__ as PIL_version
+
+if int(PIL_version.split('.')[0]) >= 9:  # Pillow 9.0.0及以上版本
+    resample_method = Image.LANCZOS
+else:
+    resample_method = Image.ANTIALIAS
+
+
+
 
 class ImageGalleryApp:
     def __init__(self, master, csv_file_path):
@@ -23,34 +32,51 @@ class ImageGalleryApp:
         return images
 
     def create_ui(self):
-        self.canvas = tk.Canvas(self.master, borderwidth=0)
-        self.frame = tk.Frame(self.canvas)
-        self.vsb = ttk.Scrollbar(self.master, orient="vertical", command=self.canvas.yview)
-        self.canvas.configure(yscrollcommand=self.vsb.set)
+        self.canvas = tk.Canvas(self.master)
+        self.scrollbar = ttk.Scrollbar(self.master, orient="vertical", command=self.canvas.yview)
+        self.scrollable_frame = ttk.Frame(self.canvas)
 
-        self.vsb.pack(side="right", fill="y")
+        self.scrollable_frame.bind(
+            "<Configure>",
+            lambda e: self.canvas.configure(
+                scrollregion=self.canvas.bbox("all")
+            )
+        )
+
+        self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        self.canvas.configure(yscrollcommand=self.scrollbar.set)
+
+        # Improved scrolling support on macOS and Windows
+        # 移除了 "<Touch>" 事件绑定，因为它在一些环境中不被支持
+        self.master.bind_all("<MouseWheel>", self._on_mousewheel)
+
+        self.scrollbar.pack(side="right", fill="y")
         self.canvas.pack(side="left", fill="both", expand=True)
-        self.canvas.create_window((4,4), window=self.frame, anchor="nw", tags="self.frame")
 
-        self.frame.bind("<Configure>", self.on_frame_configure)
         self.populate()
 
     def populate(self):
+        rows, columns = 0, 0
         for img_path, pptx_path in self.images:
+            if columns == 3:  # Adjust based on desired number of columns
+                columns = 0
+                rows += 1
             try:
                 img = Image.open(img_path)
-                img.thumbnail((100, 100), Image.ANTIALIAS)
+                img.thumbnail((200, 200), resample_method)  # Adjust thumbnail size as needed
                 tk_img = ImageTk.PhotoImage(img)
-                btn = tk.Button(self.frame, image=tk_img)
+                btn = tk.Button(self.scrollable_frame, image=tk_img, command=lambda p=pptx_path: self.open_pptx(p))
                 btn.image = tk_img
-                btn.bind("<Double-1>", lambda e, p=pptx_path: self.open_pptx(p))  # Double-click to open
-                btn.pack(side="top", fill="both", expand=True)
+                btn.grid(row=rows, column=columns, padx=10, pady=10)
+                columns += 1
             except Exception as e:
                 print(f"Error loading image: {img_path}, {e}")
 
-    def on_frame_configure(self, event):
-        '''Reset the scroll region to encompass the inner frame'''
-        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+    def _on_mousewheel(self, event):
+        if platform.system() == "Darwin":  # macOS
+            self.canvas.yview_scroll(int(-1 * (event.delta)), "units")
+        else:
+            self.canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
 
     def open_pptx(self, pptx_path):
         try:
