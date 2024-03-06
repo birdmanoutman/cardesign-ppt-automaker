@@ -9,6 +9,21 @@ import imagehash
 import pandas as pd
 
 
+def get_unique_hashes(csv_path):
+    """使用pandas读取CSV文件，并返回所有'Is Duplicate'为0的图片hash的集合。"""
+    if os.path.exists(csv_path):
+        # 读取CSV文件
+        df = pd.read_csv(csv_path)
+
+        # 筛选出'Is Duplicate'为0的行
+        unique_hashes_df = df[df['Is Duplicate'] == 0]
+
+        # 如果DataFrame不为空，返回'Image Hash'列的值组成的集合
+        if not unique_hashes_df.empty:
+            return set(unique_hashes_df['Image Hash'])
+    return set()
+
+
 def mark_and_remove_duplicates_in_csv(file_path):
     """标记csv文件中hash重复的项目，重复标记为1，不重复标记为0"""
     # 读取CSV文件
@@ -50,7 +65,7 @@ def is_size_similar(img_width, img_height, slide_width, slide_height):
     return (abs(img_width - slide_width) < tolerance and abs(img_height - slide_height) < tolerance) or (img_width >= slide_width and img_height >= slide_height)
 
 
-def save_image(image, slide_idx, shape_idx, pptx_filename, dest_folder, csv_writer):
+def save_image(image, slide_idx, shape_idx, pptx_filename, dest_folder, csv_writer, existing_hashes):
     """保存图片并记录到CSV。"""
     try:
         image_bytes = io.BytesIO(image.blob)
@@ -63,16 +78,23 @@ def save_image(image, slide_idx, shape_idx, pptx_filename, dest_folder, csv_writ
         img_name = f"{os.path.splitext(os.path.basename(pptx_filename))[0]}_{slide_idx+1}_{shape_idx+1}.{file_extension}"
         img_path = os.path.join(dest_folder, img_name)
 
-        img.save(img_path)
-        logging.info(f"图片已保存: {img_path}")
+        if img_hash in existing_hashes:
+
+            logging.info(f"重复图片: {img_path}")
+
+        else:
+            img.save(img_path)
+            logging.info(f"保存图片: {img_path}")
 
         csv_writer.writerow([pptx_filename, img_path, img_hash])
+
     except UnidentifiedImageError:
         logging.error(f"UnidentifiedImageError: Cannot identify image file in {pptx_filename}, slide {slide_idx+1}, shape {shape_idx+1}.")
     except Exception as e:
         logging.error(f"Error saving image: {e}")
 
-def save_slide_images(pptx_file, dest_folder, csv_writer):
+
+def save_slide_images(pptx_file, dest_folder, csv_writer, existing_hashes):
     """处理PPTX文件中的每个幻灯片图片。"""
     try:
         presentation = Presentation(pptx_file)
@@ -85,14 +107,20 @@ def save_slide_images(pptx_file, dest_folder, csv_writer):
                     slide_height = presentation.slide_height
 
                     if is_size_similar(img_width, img_height, slide_width, slide_height):
-                        save_image(shape.image, slide_idx, shape_idx, pptx_file, dest_folder, csv_writer)
+                        save_image(shape.image, slide_idx, shape_idx, pptx_file, dest_folder, csv_writer, existing_hashes)
     except Exception as e:
         logging.error(f"Error processing {pptx_file}: {e}")
+
 
 def main(src_folder, dest_folder, csv_file_path):
     """主函数，遍历目录，处理PPTX文件。"""
     if not os.path.exists(dest_folder):
         os.makedirs(dest_folder)
+    try:
+        existing_hashes = get_unique_hashes(csv_file_path)
+
+    except:
+        existing_hashes = None
 
     with open(csv_file_path, mode='w', newline='', encoding='utf-8') as csv_file:
         csv_writer = csv.writer(csv_file)
@@ -102,7 +130,7 @@ def main(src_folder, dest_folder, csv_file_path):
             for file in files:
                 if file.endswith(".pptx") and not file.startswith("~$"):
                     pptx_path = os.path.join(root, file)
-                    save_slide_images(pptx_path, dest_folder, csv_writer)
+                    save_slide_images(pptx_path, dest_folder, csv_writer, existing_hashes)
                     logging.info(f"Processed {pptx_path}")
 
     # 找到重复的hash，更新csv表格，并删除重复的图片文件
