@@ -128,7 +128,7 @@ def main(src_folder, dest_folder, csv_file_path):
 
         for root, dirs, files in os.walk(src_folder):
             for file in files:
-                if file.endswith(".pptx") and not file.startswith("~$"):
+                if file.endswith(".pptx") and not file.startswith("~$") and not file.startswith("._"):
                     pptx_path = os.path.join(root, file)
                     save_slide_images(pptx_path, dest_folder, csv_writer, existing_hashes)
                     logging.info(f"Processed {pptx_path}")
@@ -138,7 +138,7 @@ def main(src_folder, dest_folder, csv_file_path):
 
 
 if __name__ == "__main__":
-    src_folder = "/Users/birdmanoutman/上汽"
-    dest_folder = "/Users/birdmanoutman/上汽/backgroundIMGsource"
+    src_folder = "E:\\"
+    dest_folder = "source"
     csv_file_path = os.path.join(dest_folder, "image_ppt_mapping.csv")
     main(src_folder, dest_folder, csv_file_path)
