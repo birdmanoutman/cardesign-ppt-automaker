@@ -6,6 +6,8 @@ import csv
 import os
 import subprocess
 import threading
+from PyQt5.QtWidgets import QSizePolicy
+from PyQt5.QtCore import QSize
 
 
 class ImageGalleryApp(QWidget):
@@ -19,25 +21,70 @@ class ImageGalleryApp(QWidget):
 
         self.csv_file_path = csv_file_path
         self.images = self.load_images_from_csv()
-
         self.create_ui()
-        self.setup_connections()  # 设置信号和槽的连接（如果有）
+        self.setup_connections()
+        self.pixmap_cache = {}  # 图片缓存
+        self.current_widgets = []  # 当前显示的部件列表
+
+
+    @staticmethod
+    def clear_layout(layout):
+        for i in reversed(range(layout.count())):
+            widget = layout.itemAt(i).widget()
+            if widget is not None:
+                layout.removeWidget(widget)
+                widget.deleteLater()
 
     def create_ui(self):
-        self.scroll_area = QScrollArea(self)  # 创建滚动区域
+        self.scroll_area = QScrollArea(self)
         self.scroll_area.setWidgetResizable(True)
 
-        self.container = QWidget()  # 创建用于放置内容的容器
-        self.grid_layout = QGridLayout()  # 创建网格布局
-        self.container.setLayout(self.grid_layout)  # 将网格布局设置给容器
+        self.container = QWidget()
+        self.grid_layout = QGridLayout(self.container)
+        self.container.setLayout(self.grid_layout)
 
-        self.populate()  # 填充内容
+        self.scroll_area.setWidget(self.container)
 
-        self.scroll_area.setWidget(self.container)  # 将容器设置为滚动区域的子Widget
+        layout = QVBoxLayout(self)
+        layout.addWidget(self.scroll_area)
+        self.setLayout(layout)
 
-        layout = QVBoxLayout(self)  # 创建一个垂直布局
-        layout.addWidget(self.scroll_area)  # 将滚动区域添加到垂直布局中
-        self.setLayout(layout)  # 将垂直布局设置为主窗口的布局
+    def update_widget_with_image_data(self, vertical_layout, image_data):
+        img_path = image_data['img_path']
+        pptx_paths = image_data['pptx_paths']
+
+        # 首先更新或添加图片
+        if vertical_layout.count() > 0:
+            # 假设第一个widget是图片标签
+            label = vertical_layout.itemAt(0).widget()
+        else:
+            label = QLabel()
+            vertical_layout.addWidget(label)
+
+        # 检查图片缓存，更新或添加图片
+        if img_path not in self.pixmap_cache:
+            pixmap = QPixmap(img_path).scaled(200, 200, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            self.pixmap_cache[img_path] = pixmap
+        else:
+            pixmap = self.pixmap_cache[img_path]
+        label.setPixmap(pixmap)
+
+        # 确保所有旧的按钮被清除，除了图片标签以外
+        while vertical_layout.count() > 1:
+            widget_to_remove = vertical_layout.itemAt(1).widget()
+            vertical_layout.removeWidget(widget_to_remove)
+            widget_to_remove.deleteLater()
+
+        # 添加新的PPTX按钮
+        for pptx_path in pptx_paths:
+            pptx_btn_text = os.path.basename(pptx_path)
+            pptx_btn = QPushButton(pptx_btn_text)
+            pptx_btn.clicked.connect(lambda checked, path=pptx_path: self.open_pptx(path))
+            vertical_layout.addWidget(pptx_btn)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self.populate()  # 确保窗口显示后填充元素
 
     def load_images_from_csv(self):
         images = {}
@@ -52,14 +99,6 @@ class ImageGalleryApp(QWidget):
                         images[img_hash]['pptx_paths'].append(row['PPTX File'])
         return list(images.values())
 
-    def clear_layout(self, layout):
-        for i in reversed(range(layout.count())):
-            widget = layout.itemAt(i).widget()
-            if widget is not None:
-                layout.removeWidget(widget)
-                widget.deleteLater()
-
-
     def calculate_columns(self):
         container_width = self.scroll_area.width()  # 获取滚动区域的当前宽度
         item_width = 250  # 假设每个图片加上内边距等需要的宽度
@@ -67,58 +106,53 @@ class ImageGalleryApp(QWidget):
         return columns
 
     def populate(self):
-        self.clear_layout(self.grid_layout)  # 清除当前网格布局中的所有项
+        max_columns = self.calculate_columns()
+        print(f"Max Columns: {max_columns}")
 
-        rows = 0
-        max_columns = self.calculate_columns()  # 动态计算最大列数
-        dynamic_padx, dynamic_pady = self.calculate_dynamic_padding()  # 动态计算内边距
+        required_widgets_count = len(self.images)
+        current_widgets_count = len(self.current_widgets)
 
-        for row_number, image_data in enumerate(self.images):
-            img_path = image_data['img_path']
-            pptx_paths = image_data['pptx_paths']
+        # 移除多余的部件
+        for i in range(required_widgets_count, current_widgets_count):
+            widget = self.current_widgets.pop()
+            self.grid_layout.removeWidget(widget)
+            widget.deleteLater()
 
-            pixmap = QPixmap(img_path).scaled(200, 200, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-            label = QLabel()
-            label.setPixmap(pixmap)
+        row_number = 0
+        col_number = 0
 
-            vertical_layout = QVBoxLayout()
-            vertical_layout.addWidget(label)
+        for index, image_data in enumerate(self.images):
+            if index < current_widgets_count:
+                # 复用现有的widget和layout
+                container_widget = self.current_widgets[index]
+                vertical_layout = container_widget.layout()
+            else:
+                # 创建新的widget和layout
+                container_widget = QWidget()
+                vertical_layout = QVBoxLayout()
+                container_widget.setLayout(vertical_layout)
+                self.current_widgets.append(container_widget)
 
-            for pptx_path in pptx_paths:
-                pptx_btn_text = os.path.basename(pptx_path)
-                if len(pptx_btn_text) > 16:
-                    pptx_btn_text = pptx_btn_text[:8] + "..." + pptx_btn_text[-5:]
-                pptx_btn = QPushButton(pptx_btn_text)
-                pptx_btn.clicked.connect(lambda checked, path=pptx_path: self.open_pptx(path))
-                vertical_layout.addWidget(pptx_btn)
+            # 更新图片和按钮
+            self.update_widget_with_image_data(vertical_layout, image_data)
 
-            container_widget = QWidget()
-            container_widget.setLayout(vertical_layout)
-            # 注意，这里没有显式处理列的增加，假设每个 container_widget 占据一列
-            self.grid_layout.addWidget(container_widget, rows, row_number % max_columns, 1, 1, Qt.AlignTop)
+            # 更新widget位置
+            if self.grid_layout.itemAtPosition(row_number, col_number) is not None:
+                self.grid_layout.removeItem(self.grid_layout.itemAtPosition(row_number, col_number))
+            self.grid_layout.addWidget(container_widget, row_number, col_number, 1, 1, Qt.AlignTop)
 
-            if (row_number + 1) % max_columns == 0:
-                rows += 1
+            col_number += 1
+            if col_number >= max_columns:
+                col_number = 0
+                row_number += 1
+
+        # 确保所有部件都是可见的
+        for widget in self.current_widgets:
+            widget.setVisible(True)
 
     def resizeEvent(self, event):
         self.populate()  # 重新排列图片和按钮
         super().resizeEvent(event)
-
-    def arrange_images(self):
-        rows, columns = 0, 0
-        max_columns = self.calculate_columns()  # 动态计算列数
-
-        for btn, img_path, pptx_path in self.image_buttons:
-            if columns >= max_columns:
-                columns = 0
-                rows += 1
-
-            # 假设这里的 btn 是一个自定义的 QWidget，其中包含了图片和按钮
-            # 动态调整内边距，可以根据需要调整 10 的值
-            dynamic_padx, dynamic_pady = self.calculate_dynamic_padding()
-
-            btn.grid(row=rows, column=columns, padx=dynamic_padx, pady=dynamic_pady)
-            columns += 1
 
     def setup_connections(self):
         pass
