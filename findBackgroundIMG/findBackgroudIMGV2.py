@@ -138,7 +138,7 @@ def main(src_folder, dest_folder, csv_file_path):
 
 
 if __name__ == "__main__":
-    src_folder = "/Users/birdmanoutman/Desktop"
-    dest_folder = "/Users/birdmanoutman/Desktop/outputTest"
+    src_folder = "G:\\"
+    dest_folder = "D:\PycharmProjects\cardesign-ppt-automaker\\findBackgroundIMG\source"
     csv_file_path = os.path.join(dest_folder, "image_ppt_mapping.csv")
     main(src_folder, dest_folder, csv_file_path)

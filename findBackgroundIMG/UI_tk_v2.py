@@ -63,27 +63,6 @@ class ImageGalleryApp:
         self.populate()
         self.master.bind("<Configure>", self.on_window_resize)
 
-    def populate_initial(self):
-        rows, columns = 0, 0
-        for img_path, pptx_path in self.images:
-            if columns == 3:  # Adjust based on desired number of columns
-                columns = 0
-                rows += 1
-            try:
-                img = Image.open(img_path)
-                img.thumbnail((200, 200), Image.LANCZOS)  # Adjust thumbnail size as needed, using LANCZOS for high quality
-                tk_img = ImageTk.PhotoImage(img)
-                btn = tk.Button(self.scrollable_frame, image=tk_img)
-                btn.image = tk_img
-                btn.grid(row=rows, column=columns, padx=10, pady=10)
-                columns += 1
-                # Bind double-click event to open PPTX file in a background thread
-                btn.bind("<Double-1>", lambda e, p=pptx_path: self.open_pptx(p))
-                # Bind single-click event for selecting the image
-                btn.bind("<Button-1>", lambda e, btn=btn: self.select_image(btn))
-            except Exception as e:
-                print(f"Error loading image: {img_path}, {e}")
-
     def _on_mousewheel(self, event):
         if platform.system() == "Darwin":  # macOS
             self.canvas.yview_scroll(int(-1 * (event.delta)), "units")
@@ -167,5 +146,5 @@ class ImageGalleryApp:
 
 if __name__ == "__main__":
     root = tk.Tk()
-    app = ImageGalleryApp(root, "/Users/birdmanoutman/Desktop/outputTest/image_ppt_mapping.csv")
+    app = ImageGalleryApp(root, "source/image_ppt_mapping.csv")
     root.mainloop()

@@ -63,7 +63,7 @@ def save_slide_images(pptx_file, dest_folder, csv_writer):
 # 指定需要遍历的文件夹路径和存储图片的文件夹路径
 src_folder = "/Users/birdmanoutman/Desktop"
 dest_folder = "/Users/birdmanoutman/Desktop/outputTest"
-csv_file_path = os.path.join(dest_folder, "image_ppt_mapping.csv")
+csv_file_path = os.path.join(dest_folder, "source/image_ppt_mapping.csv")
 
 
 # 确保目标文件夹存在
