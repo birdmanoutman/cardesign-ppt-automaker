@@ -12,6 +12,9 @@ import threading
 import tempfile
 
 
+
+
+
 class ImageGalleryApp(QWidget):
     def __init__(self, csv_file_path):
         super().__init__()
@@ -46,6 +49,7 @@ class ImageGalleryApp(QWidget):
     def create_ui(self):
         self.scroll_area = QScrollArea(self)
         self.scroll_area.setWidgetResizable(True)
+
         self.container = QWidget()
         self.grid_layout = QGridLayout(self.container)
         self.container.setLayout(self.grid_layout)
@@ -74,16 +78,29 @@ class ImageGalleryApp(QWidget):
 
         label.image_hash = img_hash
 
-        # 检查图片缓存，更新或添加图片
-        if img_path not in self.pixmap_cache:
-            pixmap = QPixmap(img_path).scaled(200, 200, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-            self.pixmap_cache[img_path] = pixmap
-        else:
-            pixmap = self.pixmap_cache[img_path]
-        label.setPixmap(pixmap)
+        try:
+            pixmap = self.pixmap_cache.get(img_path)
 
-        # 获取图片宽度用于后续按钮宽度调整
-        image_width = pixmap.width()
+            if pixmap is None:
+                pixmap = QPixmap(img_path)
+                if pixmap.isNull():
+                    # 如果图片无法加载，则打印错误信息并尝试继续
+                    print(f"Unable to load the image at path: {img_path}")
+                else:
+                    # 如果图片加载成功，则将其加入到缓存
+                    self.pixmap_cache[img_path] = pixmap
+
+            if pixmap and not pixmap.isNull():
+                label.setPixmap(pixmap.scaled(200, 200, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+                # 获取图片宽度用于后续按钮宽度调整
+                image_width = pixmap.width()
+            else:
+                raise IOError(f"Cannot load image: {img_path}")
+
+        except Exception as e:
+            print(f"Error loading image {img_path}: {e}")
+            # 在此处设置默认图片或错误标志
+            label.setText("Image not available")
 
         # 确保所有旧的按钮被清除，除了图片标签以外
         while vertical_layout.count() > 1:
@@ -141,7 +158,6 @@ class ImageGalleryApp(QWidget):
         row_number = 0
         col_number = 0
 
-        # ...在populate函数中的对应部分...
         for index, image_data in enumerate(self.images):
             if index < current_widgets_count:
                 # 复用现有的widget和layout
@@ -296,6 +312,6 @@ class ClickableLabel(QLabel):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    gallery_app = ImageGalleryApp("source/image_ppt_mapping.csv")
+    gallery_app = ImageGalleryApp("/Users/birdmanoutman/上汽/backgroundIMGsource/image_ppt_mapping.csv")
     gallery_app.show()
     sys.exit(app.exec_())

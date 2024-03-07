@@ -280,6 +280,6 @@ class ClickableLabel(QLabel):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    gallery_app = ImageGalleryApp("/UI_Qt_v1.pyUsers/birdmanoutman/上汽/backgroundIMGsource/image_ppt_mapping.csv")
+    gallery_app = ImageGalleryApp("/Users/birdmanoutman/上汽/backgroundIMGsource/image_ppt_mapping.csv")
     gallery_app.show()
     sys.exit(app.exec_())
