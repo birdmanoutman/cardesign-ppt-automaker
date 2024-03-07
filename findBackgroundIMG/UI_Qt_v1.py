@@ -6,8 +6,6 @@ import csv
 import os
 import subprocess
 import threading
-from PyQt5.QtWidgets import QSizePolicy
-from PyQt5.QtCore import QSize
 
 
 class ImageGalleryApp(QWidget):
@@ -69,6 +67,9 @@ class ImageGalleryApp(QWidget):
             pixmap = self.pixmap_cache[img_path]
         label.setPixmap(pixmap)
 
+        # 获取图片宽度用于后续按钮宽度调整
+        image_width = pixmap.width()
+
         # 确保所有旧的按钮被清除，除了图片标签以外
         while vertical_layout.count() > 1:
             widget_to_remove = vertical_layout.itemAt(1).widget()
@@ -78,8 +79,12 @@ class ImageGalleryApp(QWidget):
         # 添加新的PPTX按钮
         for pptx_path in pptx_paths:
             pptx_btn_text = os.path.basename(pptx_path)
+            # 检查文本长度，并在必要时调整它
+            if len(pptx_btn_text) > 16:
+                pptx_btn_text = pptx_btn_text[:7] + "..." + pptx_btn_text[-6:]
             pptx_btn = QPushButton(pptx_btn_text)
             pptx_btn.clicked.connect(lambda checked, path=pptx_path: self.open_pptx(path))
+            pptx_btn.setFixedWidth(image_width)  # 设置按钮宽度与图片宽度一致
             vertical_layout.addWidget(pptx_btn)
 
     def showEvent(self, event):
@@ -185,6 +190,6 @@ class ImageGalleryApp(QWidget):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    gallery_app = ImageGalleryApp("source/image_ppt_mapping.csv")
+    gallery_app = ImageGalleryApp("/Users/birdmanoutman/上汽/backgroundIMGsource/image_ppt_mapping.csv")
     gallery_app.show()
     sys.exit(app.exec_())
