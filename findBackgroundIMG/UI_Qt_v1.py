@@ -1,11 +1,18 @@
 import sys
-from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QLabel, QScrollArea, QGridLayout
+from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QLabel, QScrollArea, QGridLayout, QMenu
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QMessageBox
+
 import csv
 import os
 import subprocess
 import threading
+
+import tempfile
+
+
+
 
 
 class ImageGalleryApp(QWidget):
@@ -23,7 +30,6 @@ class ImageGalleryApp(QWidget):
         self.setup_connections()
         self.pixmap_cache = {}  # 图片缓存
         self.current_widgets = []  # 当前显示的部件列表
-
 
     @staticmethod
     def clear_layout(layout):
@@ -50,14 +56,21 @@ class ImageGalleryApp(QWidget):
     def update_widget_with_image_data(self, vertical_layout, image_data):
         img_path = image_data['img_path']
         pptx_paths = image_data['pptx_paths']
+        img_hash = image_data.get('img_hash')  # 假设image_data字典中有img_hash这一项
 
-        # 首先更新或添加图片
+        # 创建或更新ClickableLabel时，现在还需要传递img_path
         if vertical_layout.count() > 0:
-            # 假设第一个widget是图片标签
             label = vertical_layout.itemAt(0).widget()
+            if not isinstance(label, ClickableLabel):
+                label.deleteLater()  # 删除原有的Label
+                label = ClickableLabel(img_hash, img_path, self)  # 创建新的ClickableLabel并传递img_path
+                vertical_layout.insertWidget(0, label)
         else:
-            label = QLabel()
+            label = ClickableLabel(img_hash, img_path, self)
             vertical_layout.addWidget(label)
+
+
+        label.image_hash = img_hash
 
         # 检查图片缓存，更新或添加图片
         if img_path not in self.pixmap_cache:
@@ -80,8 +93,8 @@ class ImageGalleryApp(QWidget):
         for pptx_path in pptx_paths:
             pptx_btn_text = os.path.basename(pptx_path)
             # 检查文本长度，并在必要时调整它
-            if len(pptx_btn_text) > 16:
-                pptx_btn_text = pptx_btn_text[:7] + "..." + pptx_btn_text[-6:]
+            if len(pptx_btn_text) > 20:
+                pptx_btn_text = pptx_btn_text[:9] + "..." + pptx_btn_text[-7:]
             pptx_btn = QPushButton(pptx_btn_text)
             pptx_btn.clicked.connect(lambda checked, path=pptx_path: self.open_pptx(path))
             pptx_btn.setFixedWidth(image_width)  # 设置按钮宽度与图片宽度一致
@@ -186,6 +199,86 @@ class ImageGalleryApp(QWidget):
                 print(f"Failed to open file: {pptx_path}, {e}")
 
         threading.Thread(target=run).start()
+
+    def delete_csv_entry(self, image_hash):
+        # 创建一个临时文件
+        temp_file, temp_file_path = tempfile.mkstemp()
+
+        with open(self.csv_file_path, newline='', encoding='utf-8') as csvfile, os.fdopen(temp_file, 'w', newline='', encoding='utf-8') as temp_csv:
+            reader = csv.DictReader(csvfile)
+            fieldnames = reader.fieldnames
+            writer = csv.DictWriter(temp_csv, fieldnames=fieldnames)
+            writer.writeheader()
+
+            # 将不需要删除的行写入临时文件
+            for row in reader:
+                if row['Image Hash'] != image_hash:
+                    writer.writerow(row)
+
+        # 替换原始文件
+        os.replace(temp_file_path, self.csv_file_path)
+
+    def deleteImage(self, image_hash):
+        # 查找要删除的图片路径
+        img_path_to_delete = None
+        for img in self.images:
+            if img.get('Image Hash') == image_hash:  # 使用get方法来避免KeyError
+                img_path_to_delete = img.get('img_path')
+                break
+
+        # 更新内存中的images数据结构，移除对应图片
+        self.images = [img for img in self.images if img.get('Image Hash') != image_hash]
+
+        # 重新写入CSV文件
+        with open(self.csv_file_path, 'w', newline='', encoding='utf-8') as csvfile:
+            fieldnames = ['Image Hash', 'Image File', 'PPTX File']
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            for img in self.images:
+                for pptx_path in img.get('pptx_paths', []):
+                    writer.writerow({'Image Hash': img.get('Image Hash'), 'Image File': img.get('img_path'), 'PPTX File': pptx_path})
+
+        # 从文件系统中删除图片文件
+        if img_path_to_delete and os.path.exists(img_path_to_delete):
+            os.remove(img_path_to_delete)
+
+        # 重新加载界面
+        self.populate()
+
+
+class ClickableLabel(QLabel):
+    def __init__(self, image_hash, img_path, parent=None):
+        super().__init__(parent)
+        self.image_hash = image_hash  # 保存图片的哈希值或其他唯一标识
+        self.img_path = img_path  # 保存原图的路径
+        self.gallery_app = gallery_app  # 存储对ImageGalleryApp实例的引用
+
+    def copyToClipboard(self):
+        # 加载原图
+        pixmap = QPixmap(self.img_path)
+        # 复制到剪贴板
+        QApplication.clipboard().setPixmap(pixmap)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.RightButton:
+            self.showContextMenu(event.pos())
+        else:
+            super().mousePressEvent(event)
+
+    def showContextMenu(self, position):
+        menu = QMenu()
+        copy_action = menu.addAction("复制图片")
+        delete_action = menu.addAction("删除图片")
+        action = menu.exec_(self.mapToGlobal(position))
+        if action == copy_action:
+            self.copyToClipboard()
+        elif action == delete_action:
+            self.deleteImage()
+
+    def deleteImage(self):
+        reply = QMessageBox.question(self, '删除确认', "你确定要删除这张图片吗？", QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if reply == QMessageBox.Yes:
+            self.gallery_app.delete_csv_entry(self.image_hash)  # 通过gallery_app引用调用方法
 
 
 if __name__ == "__main__":
