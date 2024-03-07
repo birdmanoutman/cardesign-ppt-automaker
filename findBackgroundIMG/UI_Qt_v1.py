@@ -12,12 +12,12 @@ import threading
 import tempfile
 
 
-
-
-
 class ImageGalleryApp(QWidget):
     def __init__(self, csv_file_path):
         super().__init__()
+        self.grid_layout = None
+        self.container = None
+        self.scroll_area = None
         self.setWindowTitle("Image Gallery")
 
         # 获取屏幕尺寸，调整窗口大小
@@ -33,6 +33,10 @@ class ImageGalleryApp(QWidget):
 
     @staticmethod
     def clear_layout(layout):
+        while layout.count():
+            child = layout.takeAt(0)
+            if child.widget():
+                child.widget().deleteLater()
         for i in reversed(range(layout.count())):
             widget = layout.itemAt(i).widget()
             if widget is not None:
@@ -42,7 +46,6 @@ class ImageGalleryApp(QWidget):
     def create_ui(self):
         self.scroll_area = QScrollArea(self)
         self.scroll_area.setWidgetResizable(True)
-
         self.container = QWidget()
         self.grid_layout = QGridLayout(self.container)
         self.container.setLayout(self.grid_layout)
@@ -68,7 +71,6 @@ class ImageGalleryApp(QWidget):
         else:
             label = ClickableLabel(img_hash, img_path, self)
             vertical_layout.addWidget(label)
-
 
         label.image_hash = img_hash
 
@@ -139,6 +141,7 @@ class ImageGalleryApp(QWidget):
         row_number = 0
         col_number = 0
 
+        # ...在populate函数中的对应部分...
         for index, image_data in enumerate(self.images):
             if index < current_widgets_count:
                 # 复用现有的widget和layout
@@ -154,9 +157,16 @@ class ImageGalleryApp(QWidget):
             # 更新图片和按钮
             self.update_widget_with_image_data(vertical_layout, image_data)
 
-            # 更新widget位置
+            # 更新widget位置前，先移除旧的widget
             if self.grid_layout.itemAtPosition(row_number, col_number) is not None:
-                self.grid_layout.removeItem(self.grid_layout.itemAtPosition(row_number, col_number))
+                # 移除并删除当前位置的widget
+                item = self.grid_layout.itemAtPosition(row_number, col_number)
+                widget_to_remove = item.widget()
+                if widget_to_remove is not None:
+                    self.grid_layout.removeWidget(widget_to_remove)
+                    widget_to_remove.deleteLater()
+
+            # 然后添加新的widget到GridLayout
             self.grid_layout.addWidget(container_widget, row_number, col_number, 1, 1, Qt.AlignTop)
 
             col_number += 1
@@ -204,7 +214,8 @@ class ImageGalleryApp(QWidget):
         # 创建一个临时文件
         temp_file, temp_file_path = tempfile.mkstemp()
 
-        with open(self.csv_file_path, newline='', encoding='utf-8') as csvfile, os.fdopen(temp_file, 'w', newline='', encoding='utf-8') as temp_csv:
+        with open(self.csv_file_path, newline='', encoding='utf-8') as csvfile, os.fdopen(temp_file, 'w', newline='',
+                                                                                          encoding='utf-8') as temp_csv:
             reader = csv.DictReader(csvfile)
             fieldnames = reader.fieldnames
             writer = csv.DictWriter(temp_csv, fieldnames=fieldnames)
@@ -236,7 +247,8 @@ class ImageGalleryApp(QWidget):
             writer.writeheader()
             for img in self.images:
                 for pptx_path in img.get('pptx_paths', []):
-                    writer.writerow({'Image Hash': img.get('Image Hash'), 'Image File': img.get('img_path'), 'PPTX File': pptx_path})
+                    writer.writerow({'Image Hash': img.get('Image Hash'), 'Image File': img.get('img_path'),
+                                     'PPTX File': pptx_path})
 
         # 从文件系统中删除图片文件
         if img_path_to_delete and os.path.exists(img_path_to_delete):
@@ -276,13 +288,14 @@ class ClickableLabel(QLabel):
             self.deleteImage()
 
     def deleteImage(self):
-        reply = QMessageBox.question(self, '删除确认', "你确定要删除这张图片吗？", QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        reply = QMessageBox.question(self, '删除确认', "你确定要删除这张图片吗？", QMessageBox.Yes | QMessageBox.No,
+                                     QMessageBox.No)
         if reply == QMessageBox.Yes:
             self.gallery_app.delete_csv_entry(self.image_hash)  # 通过gallery_app引用调用方法
 
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    gallery_app = ImageGalleryApp("/Users/birdmanoutman/上汽/backgroundIMGsource/image_ppt_mapping.csv")
+    gallery_app = ImageGalleryApp("source/image_ppt_mapping.csv")
     gallery_app.show()
     sys.exit(app.exec_())
