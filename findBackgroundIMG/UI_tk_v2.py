@@ -146,5 +146,5 @@ class ImageGalleryApp:
 
 if __name__ == "__main__":
     root = tk.Tk()
-    app = ImageGalleryApp(root, "source/image_ppt_mapping.csv")
+    app = ImageGalleryApp(root, "/Users/birdmanoutman/上汽/backgroundIMGsource/image_ppt_mapping.csv")
     root.mainloop()
