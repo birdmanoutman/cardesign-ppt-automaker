@@ -102,16 +102,20 @@ class ImageGalleryApp(QWidget):
         self.populate()  # 确保窗口显示后填充元素
 
     def load_images_from_csv(self):
+        """为了修复windows系统中的空白界面问题，让程序只加载png和jpg、jpeg格式图片，但没啥用"""
         images = {}
         with open(self.csv_file_path, newline='', encoding='utf-8') as csvfile:
             reader = csv.DictReader(csvfile)
             for row in reader:
-                img_hash = row['Image Hash']
-                if img_hash not in images:
-                    images[img_hash] = {'img_path': row['Image File'], 'pptx_paths': [row['PPTX File']]}
-                else:
-                    if row['PPTX File'] not in images[img_hash]['pptx_paths']:
-                        images[img_hash]['pptx_paths'].append(row['PPTX File'])
+                img_path = row['Image File']
+                # 检查图片格式是否为PNG或JPG
+                if img_path.lower().endswith(('.png', '.jpg', '.jpeg')):
+                    img_hash = row['Image Hash']
+                    if img_hash not in images:
+                        images[img_hash] = {'img_path': img_path, 'pptx_paths': [row['PPTX File']]}
+                    else:
+                        if row['PPTX File'] not in images[img_hash]['pptx_paths']:
+                            images[img_hash]['pptx_paths'].append(row['PPTX File'])
         return list(images.values())
 
     def calculate_columns(self):
@@ -280,6 +284,6 @@ class ClickableLabel(QLabel):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    gallery_app = ImageGalleryApp("/Users/birdmanoutman/上汽/backgroundIMGsource/image_ppt_mapping.csv")
+    gallery_app = ImageGalleryApp("source/image_ppt_mapping.csv")
     gallery_app.show()
     sys.exit(app.exec_())
