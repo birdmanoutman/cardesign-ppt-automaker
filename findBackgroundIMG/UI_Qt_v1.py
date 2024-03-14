@@ -1,16 +1,15 @@
 # UI_Qt_v1.py
-import sys
-from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QLabel, QScrollArea, QGridLayout, QMenu
-from PyQt5.QtGui import QPixmap
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QMessageBox
-
 import csv
 import os
-import subprocess
-import threading
-
+import sys
 import tempfile
+
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QPixmap
+from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QLabel, QScrollArea, QGridLayout, QMenu
+from PyQt5.QtWidgets import QMessageBox
+
+from utils import open_pptx
 
 
 class ImageGalleryApp(QWidget):
@@ -113,7 +112,7 @@ class ImageGalleryApp(QWidget):
             if len(pptx_btn_text) > 20:
                 pptx_btn_text = pptx_btn_text[:9] + "..." + pptx_btn_text[-7:]
             pptx_btn = QPushButton(pptx_btn_text)
-            pptx_btn.clicked.connect(lambda checked, path=pptx_path: self.open_pptx(path))
+            pptx_btn.clicked.connect(lambda checked, path=pptx_path: open_pptx(path))
             pptx_btn.setFixedWidth(image_width)  # 设置按钮宽度与图片宽度一致
             vertical_layout.addWidget(pptx_btn)
 
@@ -209,20 +208,6 @@ class ImageGalleryApp(QWidget):
         else:  # 大窗口
             return 15, 15
 
-    def open_pptx(self, pptx_path):
-        # 在后台线程中打开PPTX文件
-        def run():
-            try:
-                if os.name == 'nt':  # Windows
-                    os.startfile(pptx_path)
-                elif sys.platform == "darwin":  # macOS
-                    subprocess.call(['open', pptx_path])
-                else:  # Assume Linux or other
-                    subprocess.call(['xdg-open', pptx_path])
-            except Exception as e:
-                print(f"Failed to open file: {pptx_path}, {e}")
-
-        threading.Thread(target=run).start()
 
     def delete_csv_entry(self, image_hash):
         # 创建一个临时文件

@@ -1,30 +1,13 @@
-import sys
-from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QLabel, QScrollArea, QGridLayout, QMenu
-from PyQt5.QtGui import QPixmap
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QMessageBox
-from PyQt5.QtGui import QImage
 import csv
 import os
-import subprocess
-import threading
 import tempfile
+import sys
 
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QImage, QPixmap
+from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QLabel, QScrollArea, QGridLayout, QMenu, QMessageBox
 
-def open_pptx(pptx_path):
-    """ 在后台线程中打开PPTX文件"""
-    def run():
-        try:
-            if os.name == 'nt':  # Windows
-                os.startfile(pptx_path)
-            elif sys.platform == "darwin":  # macOS
-                subprocess.call(['open', pptx_path])
-            else:  # Assume Linux or other
-                subprocess.call(['xdg-open', pptx_path])
-        except Exception as e:
-            print(f"Failed to open file: {pptx_path}, {e}")
-
-    threading.Thread(target=run).start()
+from utils import open_pptx
 
 
 class ImageGalleryApp(QWidget):
@@ -265,7 +248,6 @@ class ClickableLabel(QLabel):
         pixmap = QPixmap(self.img_path)
         # 复制到剪贴板
         QApplication.clipboard().setPixmap(pixmap)
-
 
     def mousePressEvent(self, event):
         if event.button() == Qt.RightButton:

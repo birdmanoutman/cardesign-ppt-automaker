@@ -1,9 +1,11 @@
-import os
-from pptx import Presentation
-from PIL import Image
+import csv
 import imghdr
 import io
-import csv
+import os
+
+from PIL import Image
+from pptx import Presentation
+
 
 def get_image_format(image_blob):
     """
@@ -25,6 +27,7 @@ def is_size_similar(img_width, img_height, slide_width, slide_height):
         return True
     return False
 
+
 def save_image(image, slide_idx, shape_idx, pptx_filename, dest_folder, csv_writer):
     image_bytes = io.BytesIO(image.blob)
     img = Image.open(image_bytes)
@@ -37,7 +40,7 @@ def save_image(image, slide_idx, shape_idx, pptx_filename, dest_folder, csv_writ
     # 根据格式设置文件后缀
     file_extension = 'jpg' if img_format == 'jpeg' else img_format
 
-    img_name = f"{os.path.splitext(os.path.basename(pptx_filename))[0]}_{slide_idx+1}_{shape_idx+1}.{file_extension}"
+    img_name = f"{os.path.splitext(os.path.basename(pptx_filename))[0]}_{slide_idx + 1}_{shape_idx + 1}.{file_extension}"
     img_path = os.path.join(dest_folder, img_name)
 
     # 保存图片，使用推断出的格式
@@ -46,6 +49,7 @@ def save_image(image, slide_idx, shape_idx, pptx_filename, dest_folder, csv_writ
 
     # 写入图片保存路径和对应的PPTX文件路径到CSV
     csv_writer.writerow([pptx_filename, img_path])
+
 
 def save_slide_images(pptx_file, dest_folder, csv_writer):
     presentation = Presentation(pptx_file)
@@ -60,11 +64,11 @@ def save_slide_images(pptx_file, dest_folder, csv_writer):
                 if is_size_similar(img_width, img_height, slide_width, slide_height):
                     save_image(shape.image, slide_idx, shape_idx, pptx_file, dest_folder, csv_writer)
 
+
 # 指定需要遍历的文件夹路径和存储图片的文件夹路径
 src_folder = "/Users/birdmanoutman/Desktop"
 dest_folder = "/Users/birdmanoutman/Desktop/outputTest"
 csv_file_path = os.path.join(dest_folder, "source/image_ppt_mapping.csv")
-
 
 # 确保目标文件夹存在
 if not os.path.exists(dest_folder):

@@ -1,7 +1,7 @@
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QScrollArea, QGridLayout, QPushButton, QApplication, QMessageBox, QMenu
 from PyQt5.QtGui import QPixmap, QImage
 from PyQt5.QtCore import Qt, QRunnable, QThreadPool, pyqtSignal, QObject
-from findBackgroundIMG.helper_functions import *
+from findBackgroundIMG.utils import *
 import csv
 from PyQt5.QtCore import QThread, pyqtSignal
 

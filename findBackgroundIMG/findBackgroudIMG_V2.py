@@ -1,13 +1,13 @@
-import os
 import csv
-from pptx import Presentation
-from PIL import Image, UnidentifiedImageError
 import imghdr
 import io
 import logging
+import os
+
 import imagehash
 import pandas as pd
-
+from PIL import Image, UnidentifiedImageError
+from pptx import Presentation
 
 # 设置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -79,7 +79,7 @@ def save_image(image, slide_idx, shape_idx, pptx_filename, dest_folder, csv_writ
         else:
             file_extension = 'jpg' if img_format == 'jpeg' else img_format
 
-        img_name = f"{os.path.splitext(os.path.basename(pptx_filename))[0]}_{slide_idx+1}_{shape_idx+1}.{file_extension}"
+        img_name = f"{os.path.splitext(os.path.basename(pptx_filename))[0]}_{slide_idx + 1}_{shape_idx + 1}.{file_extension}"
         img_path = os.path.join(dest_folder, img_name)
 
         if img_hash in existing_hashes:
@@ -93,7 +93,7 @@ def save_image(image, slide_idx, shape_idx, pptx_filename, dest_folder, csv_writ
         csv_writer.writerow([pptx_filename, img_path, img_hash])
 
     except UnidentifiedImageError:
-        logging.error(f"UnidentifiedImageError: Cannot identify image file in {pptx_filename}, slide {slide_idx+1}, shape {shape_idx+1}.")
+        logging.error(f"UnidentifiedImageError: Cannot identify image file in {pptx_filename}, slide {slide_idx + 1}, shape {shape_idx + 1}.")
     except Exception as e:
         logging.error(f"Error saving image: {e}")
 
@@ -146,5 +146,3 @@ if __name__ == "__main__":
     dest_folder = "/Users/birdmanoutman/上汽/backgroundIMGsource"
     csv_file_path = os.path.join(dest_folder, "image_ppt_mapping.csv")
     main(src_folder, dest_folder, csv_file_path)
-
-
