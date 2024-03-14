@@ -66,27 +66,31 @@ def is_size_similar(img_width, img_height, slide_width, slide_height):
 
 
 def save_image(image, slide_idx, shape_idx, pptx_filename, dest_folder, csv_writer, existing_hashes):
-    """保存图片并记录到CSV。"""
+    """优化保存图片并记录到CSV。"""
     try:
         image_bytes = io.BytesIO(image.blob)
         img = Image.open(image_bytes)
         img_hash = str(imagehash.average_hash(img))
 
-        img_format = get_image_format(image.blob) or 'png'
-        file_extension = 'jpg' if img_format == 'jpeg' else img_format
+        # 直接获取图片格式，优化对GIF和TIFF的处理
+        img_format = img.format.lower()
+        if img_format in ['gif', 'tiff']:
+            file_extension = 'png'
+        else:
+            file_extension = 'jpg' if img_format == 'jpeg' else img_format
 
         img_name = f"{os.path.splitext(os.path.basename(pptx_filename))[0]}_{slide_idx+1}_{shape_idx+1}.{file_extension}"
         img_path = os.path.join(dest_folder, img_name)
 
         if img_hash in existing_hashes:
-
             logging.info(f"重复图片: {img_path}")
-            csv_writer.writerow([pptx_filename, img_path, img_hash])
-
         else:
-            img.save(img_path)
+            # 如果是GIF或TIFF格式，保存为PNG
+            img.save(img_path, format='PNG' if file_extension == 'png' else img_format.upper())
             logging.info(f"保存图片: {img_path}")
-            csv_writer.writerow([pptx_filename, img_path, img_hash])
+
+        # 记录到CSV无论图片是否重复
+        csv_writer.writerow([pptx_filename, img_path, img_hash])
 
     except UnidentifiedImageError:
         logging.error(f"UnidentifiedImageError: Cannot identify image file in {pptx_filename}, slide {slide_idx+1}, shape {shape_idx+1}.")
@@ -138,7 +142,9 @@ def main(src_folder, dest_folder, csv_file_path):
 
 
 if __name__ == "__main__":
-    src_folder = "E:\\"
-    dest_folder = "source"
+    src_folder = "/Volumes/Backup/mac_backup"
+    dest_folder = "/Users/birdmanoutman/上汽/backgroundIMGsource"
     csv_file_path = os.path.join(dest_folder, "image_ppt_mapping.csv")
     main(src_folder, dest_folder, csv_file_path)
+
+

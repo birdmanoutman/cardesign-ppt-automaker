@@ -1,3 +1,4 @@
+# UI_Qt_v1.py
 import sys
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QLabel, QScrollArea, QGridLayout, QMenu
 from PyQt5.QtGui import QPixmap
@@ -10,9 +11,6 @@ import subprocess
 import threading
 
 import tempfile
-
-
-
 
 
 class ImageGalleryApp(QWidget):
