@@ -1,30 +1,3 @@
-"""这段代码是一个用于处理PPTX文件中的图片的Python脚本，名为findBackgroundIMG_V3.py。它的功能是提取PPTX演示文稿中的图片，检查这些图片是否已存在于数据库中，如果不存在，则保存新图片，并将图片信息存储到数据库中。
-
-各个对象的功能：
-1. SQLiteManager 类
-功能：管理SQLite数据库的连接、创建表、导入CSV数据到数据库、检查图片哈希值是否重复、插入图片记录到数据库，以及关闭数据库连接。
-与其他对象的关系：ImageManager 类会使用 SQLiteManager 类来查询数据库中的图片记录，判断图片是否重复，并存储新的图片记录。
-2. ImageManager 类
-功能：负责检查图片是否为重复图片（通过图片的哈希值），保存新的图片到指定文件夹，并更新数据库中的记录。
-与其他对象的关系：依赖 SQLiteManager 类来执行数据库操作，由 ImageExtractor 类调用来处理具体的图片保存逻辑。
-3. ImageExtractor 类
-功能：遍历指定源文件夹中的所有PPTX文件，提取每个演示文稿中的图片，并处理每张图片。
-与其他对象的关系：使用 ImageManager 类来处理图片的保存和数据库记录更新。它是图片提取过程的起点，负责具体的图片提取逻辑。
-4. ImageProcessor 类
-功能：这是整个脚本的核心类，负责初始化数据库管理器、图片管理器和图片提取器。它设置了整个图片处理流程的参数，如源文件夹、目标文件夹、数据库路径、CSV文件路径和数据库表名，并触发图片提取和处理过程。
-与其他对象的关系：它实例化了 SQLiteManager, ImageManager, 和 ImageExtractor 类，并通过它们协同工作完成整个图片处理流程。
-5. 全局函数 main
-功能：设定脚本的运行参数，创建 ImageProcessor 类的实例，并启动图片处理流程。
-与其他对象的关系：是脚本执行的入口点，通过实例化 ImageProcessor 类来启动整个图片处理过程。
-
-对象之间的关系总结
-SQLiteManager 负责数据库操作，
-ImageManager 负责图片的去重和保存逻辑，并与数据库交互。
-ImageExtractor 负责从PPTX文件中提取图片，并通过 ImageManager 来处理这些图片。
-ImageProcessor 作为协调者，初始化并连接了上述类的实例，定义了处理流程。
-main 函数作为程序的启动点，配置并运行 ImageProcessor。
-这种设计体现了关注点分离的原则，通过分离数据访问层、业务逻辑层和表示层，提高了代码的可维护性和可扩展性。"""
-
 # findBackgroundIMG_V3.py
 import io
 import logging
@@ -43,6 +16,10 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 
 class SQLiteManager:
+    """
+    功能：管理SQLite数据库的连接、创建表、导入CSV数据到数据库、检查图片哈希值是否重复、插入图片记录到数据库，以及关闭数据库连接。
+    与其他对象的关系：ImageManager 类会使用 SQLiteManager 类来查询数据库中的图片记录，判断图片是否重复，并存储新的图片记录。
+    """
     def __init__(self, db_path):
         self.db_path = db_path
         self.conn = None
@@ -116,6 +93,10 @@ class SQLiteManager:
 
 
 class ImageManager:
+    """
+    功能：负责检查图片是否为重复图片（通过图片的哈希值），保存新的图片到指定文件夹，并更新数据库中的记录。
+    与其他对象的关系：依赖 SQLiteManager 类来执行数据库操作，由 ImageExtractor 类调用来处理具体的图片保存逻辑。
+    """
     def __init__(self, db_manager, table_name):
         self.db_manager = db_manager
         self.table_name = table_name
@@ -139,6 +120,10 @@ class ImageManager:
 
 
 class ImageExtractor:
+    """
+    功能：遍历指定源文件夹中的所有PPTX文件，提取每个演示文稿中的图片，并处理每张图片。
+    与其他对象的关系：使用 ImageManager 类来处理图片的保存和数据库记录更新。它是图片提取过程的起点，负责具体的图片提取逻辑。
+    """
     def __init__(self, src_folder, dest_folder, image_manager):
         self.src_folder = src_folder
         self.dest_folder = dest_folder
@@ -169,6 +154,10 @@ class ImageExtractor:
 
 
 class ImageProcessor:
+    """
+    功能：这是整个脚本的核心类，负责初始化数据库管理器、图片管理器和图片提取器。它设置了整个图片处理流程的参数，如源文件夹、目标文件夹、数据库路径、CSV文件路径和数据库表名，并触发图片提取和处理过程。
+    与其他对象的关系：它实例化了 SQLiteManager, ImageManager, 和 ImageExtractor 类，并通过它们协同工作完成整个图片处理流程。
+    """
     def __init__(self, db_path, src_folder, dest_folder, csv_file_path, table_name):
         self.db_path = db_path
         self.src_folder = src_folder
@@ -196,6 +185,10 @@ class ImageProcessor:
 
 
 def main():
+    """
+    功能：设定脚本的运行参数，创建 ImageProcessor 类的实例，并启动图片处理流程。
+    与其他对象的关系：是脚本执行的入口点，通过实例化 ImageProcessor 类来启动整个图片处理过程。
+    """
     # Adjust these parameters according to your setup
     src_folder = "your_source_folder"
     dest_folder = "your_destination_folder"
