@@ -1,11 +1,4 @@
-"""这段代码是一个用于处理PPTX文件中的图片的Python脚本，名为findBackgroundIMG_V3.py。
-SQLiteManager 负责数据库操作，ImageManager 负责图片的去重和保存逻辑，并与数据库交互。
-ImageExtractor 负责从PPTX文件中提取图片，并通过 ImageManager 来处理这些图片。
-ImageProcessor 作为协调者，初始化并连接了上述类的实例，定义了处理流程。
-main 函数作为程序的启动点，配置并运行 ImageProcessor。
-这种设计体现了关注点分离的原则，通过分离数据访问层、业务逻辑层和表示层，提高了代码的可维护性和可扩展性。"""
-
-# findBackgroundIMG_sqliteV1.py
+# findBackgroundIMG_V3.py
 import io
 import logging
 import os
