@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import messagebox, Toplevel, Listbox, Label, Button
+from tkinter import messagebox, Button
 
 import win32com.client
 import win32com.client
