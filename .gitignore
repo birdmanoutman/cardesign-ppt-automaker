@@ -6,3 +6,8 @@
 /sd_api/
 /PPT_JSON_conversion/images/
 /findBackgroundIMG/source/
+/findBackgroundIMG/image_gallery.db
+/CleanPPT/integratedUI/test0.py
+/CleanPPT/integratedUI/UI_CN.spec
+/CleanPPT/integratedUI/UI.spec
+/CleanPPT/integratedUI/build/

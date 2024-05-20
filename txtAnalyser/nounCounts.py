@@ -26,6 +26,9 @@ text = read_text(filePath)
 # 向jieba词典中添加新词MG，并指定为名词
 jieba.add_word('MG', tag='n')
 jieba.add_word('设计战略', tag='n')
+jieba.add_word('荣威', tag='n')
+jieba.add_word('飞凡', tag='n')
+jieba.add_word('智己', tag='n')
 
 # 使用jieba进行中文分词和词性标注
 words = pseg.cut(text)

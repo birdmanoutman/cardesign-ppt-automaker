@@ -1,196 +1,266 @@
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QScrollArea, QGridLayout, QPushButton, QApplication, QMessageBox, QMenu
-from PyQt5.QtGui import QPixmap, QImage
-from PyQt5.QtCore import Qt, QRunnable, QThreadPool, pyqtSignal, QObject
-from findBackgroundIMG.utils import *
-import csv
-from PyQt5.QtCore import QThread, pyqtSignal
+import os
+import sqlite3
+import sys
 
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QImage, QPixmap
+from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QLabel, QScrollArea, QGridLayout, QMenu, \
+    QMessageBox
 
-class ImageLoaderTask(QRunnable):
-    def __init__(self, imagePath, callback):
-        super().__init__()
-        self.imagePath = imagePath
-        self.callback = callback
-
-    def run(self):
-        try:
-            pixmap = QPixmap(self.imagePath).scaled(200, 200, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-            success = True
-        except Exception as e:
-            print(f"Failed to load image {self.imagePath}: {e}")
-            pixmap = QPixmap()
-            success = False
-        self.callback(self.imagePath, pixmap, success)
-
+from utils import open_pptx
 
 
 class ImageGalleryApp(QWidget):
-    def __init__(self, csv_file_path):
+    def __init__(self, db_path):
         super().__init__()
         self.setWindowTitle("Image Gallery")
-        self.threadPool = QThreadPool()
+        self.db_path = db_path  # SQLite数据库的路径
+        self.images = self.load_images_from_db()
 
         # 获取屏幕尺寸，调整窗口大小
         screen_size = QApplication.instance().primaryScreen().size()
         self.resize(int(screen_size.width() * 0.8), int(screen_size.height() * 0.8))
-
-        self.csv_file_path = csv_file_path
-        self.images = self.load_images_from_csv()
-        self.columns = 4  # Adjust based on your layout preference or calculate dynamically
-
         self.create_ui()
+        self.setup_connections()
+        self.pixmap_cache = {}  # 图片缓存
+        self.current_widgets = []  # 当前显示的部件列表
+
+    @staticmethod
+    def clear_layout(layout):
+        for i in reversed(range(layout.count())):
+            widget = layout.itemAt(i).widget()
+            if widget is not None:
+                layout.removeWidget(widget)
+                widget.deleteLater()
 
     def create_ui(self):
         self.scroll_area = QScrollArea(self)
         self.scroll_area.setWidgetResizable(True)
-        container = QWidget()
-        self.grid_layout = QGridLayout(container)
-        container.setLayout(self.grid_layout)
-        self.scroll_area.setWidget(container)
-
+        self.container = QWidget()
+        self.grid_layout = QGridLayout(self.container)
+        self.container.setLayout(self.grid_layout)
+        self.scroll_area.setWidget(self.container)
         layout = QVBoxLayout(self)
         layout.addWidget(self.scroll_area)
         self.setLayout(layout)
 
-        self.populate()  # 填充界面
+    def clear_layout_placeholders(self, layout):
+        for i in reversed(range(layout.count())):
+            widget = layout.itemAt(i).widget()
+            if isinstance(widget, QWidget) and widget not in self.current_widgets:
+                layout.removeWidget(widget)
+                widget.deleteLater()
 
-    def load_images_from_csv(self):
-        images = []
-        with open(self.csv_file_path, newline='', encoding='utf-8') as csvfile:
-            reader = csv.DictReader(csvfile)
-            for row in reader:
-                img_path = row['Image File']
-                if img_path.lower().endswith(('.png', '.jpg', '.jpeg')) and not QImage(img_path).isNull():
-                    images.append({'img_path': img_path, 'pptx_paths': [row['PPTX File']]})
-        return images
-
-    def populate(self):
-        for image_data in self.images:
-            callback = lambda img_path, pixmap, success, image_data=image_data: self.onImageLoaded(img_path, pixmap,
-                                                                                                   success, image_data)
-            loaderTask = ImageLoaderTask(image_data['img_path'], callback)
-            self.threadPool.start(loaderTask)
-
-
-    def add_image_widget(self, image_data):
-        """为每个图片数据添加图片显示和操作按钮。
-
-        输入:
-        - image_data: 包含单个图片路径和相关PPTX文件路径的字典。
-
-        功能: 创建显示图片的Label和对应的打开PPTX文件的按钮。不返回任何输出。
-        """
+    def update_widget_with_image_data(self, vertical_layout, image_data):
         img_path = image_data['img_path']
         pptx_paths = image_data['pptx_paths']
+        img_hash = image_data.get('img_hash')  # 假设image_data字典中有img_hash这一项
 
-        # 创建图片显示Label
-        label = QLabel(self)
-        pixmap = QPixmap(img_path)
-        label.setPixmap(pixmap.scaled(200, 200, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+        # 创建或更新ClickableLabel时，现在还需要传递img_path
+        if vertical_layout.count() > 0:
+            label = vertical_layout.itemAt(0).widget()
+            if not isinstance(label, ClickableLabel):
+                label.deleteLater()  # 删除原有的Label
+                label = ClickableLabel(img_hash, img_path, self)  # 创建新的ClickableLabel并传递img_path
+                vertical_layout.insertWidget(0, label)
+        else:
+            label = ClickableLabel(img_hash, img_path, self)
+            vertical_layout.addWidget(label)
 
-        # 添加到布局
-        row = len(self.current_widgets)
-        self.grid_layout.addWidget(label, row, 0)
-        self.current_widgets.append(label)
+        label.image_hash = img_hash
 
-        # 为每个PPTX文件添加打开按钮
-        for pptx_path in pptx_paths:
-            btn = QPushButton(os.path.basename(pptx_path), self)
-            btn.clicked.connect(lambda checked, path=pptx_path: open_pptx(path))
-            self.grid_layout.addWidget(btn, row, 1)
-            self.current_widgets.append(btn)
-
-    def onImageLoaded(self, img_path, pixmap, success, image_data):
-        if not success:
-            print(f"Error loading image: {img_path}")
-            return
-        # 通过图片路径找到对应的图片数据
-        image_data = next((item for item in self.images if item['img_path'] == img_path), None)
-        if not image_data:
-            return  # 如果找不到对应的数据，直接返回
-
-        # 找到对应图片数据在self.images中的索引，用于确定放置位置
-        index = self.images.index(image_data)
-
-        # 创建一个新的QWidget作为容器，里面包含图片Label和对应的PPTX打开按钮
-        container_widget = QWidget()
-        vertical_layout = QVBoxLayout(container_widget)
-
-        # 创建并设置图片Label
-        label = QLabel()
+        # 检查图片缓存，更新或添加图片
+        if img_path not in self.pixmap_cache:
+            pixmap = QPixmap(img_path).scaled(200, 200, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            self.pixmap_cache[img_path] = pixmap
+        else:
+            pixmap = self.pixmap_cache[img_path]
         label.setPixmap(pixmap)
-        vertical_layout.addWidget(label)
 
-        # 为每个PPTX文件添加打开按钮
-        for pptx_path in image_data['pptx_paths']:
-            pptx_btn = QPushButton(os.path.basename(pptx_path))
+        # 获取图片宽度用于后续按钮宽度调整
+        image_width = pixmap.width()
+
+        # 确保所有旧的按钮被清除，除了图片标签以外
+        while vertical_layout.count() > 1:
+            widget_to_remove = vertical_layout.itemAt(1).widget()
+            vertical_layout.removeWidget(widget_to_remove)
+            widget_to_remove.deleteLater()
+
+        # 添加新的PPTX按钮
+        for pptx_path in pptx_paths:
+            pptx_btn_text = os.path.basename(pptx_path)
+            # 检查文本长度，并在必要时调整它
+            if len(pptx_btn_text) > 20:
+                pptx_btn_text = pptx_btn_text[:9] + "..." + pptx_btn_text[-7:]
+            pptx_btn = QPushButton(pptx_btn_text)
             pptx_btn.clicked.connect(lambda checked, path=pptx_path: open_pptx(path))
+            pptx_btn.setFixedWidth(image_width)  # 设置按钮宽度与图片宽度一致
             vertical_layout.addWidget(pptx_btn)
 
-        # 计算放置容器的行和列
-        row = index // self.columns  # self.columns 需要根据实际布局确定，表示每行能容纳的图片数量
-        column = index % self.columns
+    def show_event(self, event):
+        super().showEvent(event)
+        self.populate()  # 确保窗口显示后填充元素
 
-        # 将容器添加到网格布局中
-        self.grid_layout.addWidget(container_widget, row, column)
-        self.current_widgets.append(container_widget)  # 将容器添加到当前部件列表中，以便后续管理
+    def load_images_from_db(self):
+        images = {}
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        # 如果您只对某些列感兴趣，显式指定这些列，而不是使用*
+        cursor.execute("SELECT img_hash, img_path, pptx_path, is_duplicate FROM image_ppt_mapping")
+        for row in cursor.fetchall():
+            # 确保包括所有从数据库检索的列
+            img_hash, img_path, pptx_path, is_duplicate = row
+            if img_path.lower().endswith(('.png', '.jpg', '.jpeg')):
+                if QImage(img_path).isNull() or is_duplicate:
+                    print(f"Unable to load image: {img_path}")
+                    continue
+                if img_hash not in images:
+                    images[img_hash] = {'img_path': img_path, 'pptx_paths': [pptx_path]}
+                else:
+                    if pptx_path not in images[img_hash]['pptx_paths']:
+                        images[img_hash]['pptx_paths'].append(pptx_path)
+        conn.close()
+        return list(images.values())
+
+    def calculate_columns(self):
+        container_width = self.scroll_area.width()  # 获取滚动区域的当前宽度
+        item_width = 250  # 假设每个图片加上内边距等需要的宽度
+        columns = max(1, container_width // item_width)  # 计算可以容纳的列数，至少为1
+        return columns
+
+    def populate(self):
+        self.clear_unused_widgets()
+        max_columns = self.calculate_columns()
+
+        row_number = 0
+        col_number = 0
+        for index, image_data in enumerate(self.images):
+            if index < len(self.current_widgets):
+                container_widget = self.current_widgets[index]
+            else:
+                container_widget = QWidget()
+                vertical_layout = QVBoxLayout()
+                container_widget.setLayout(vertical_layout)
+                self.current_widgets.append(container_widget)
+                self.grid_layout.addWidget(container_widget, row_number, col_number)
+
+            vertical_layout = container_widget.layout()
+            self.update_widget_with_image_data(vertical_layout, image_data)
+
+            col_number += 1
+            if col_number >= max_columns:
+                col_number = 0
+                row_number += 1
+
+        self.remove_excess_widgets(row_number, col_number, max_columns)
+
+    def clear_unused_widgets(self):
+        for i in reversed(range(len(self.current_widgets))):
+            widget = self.current_widgets[i]
+            self.grid_layout.removeWidget(widget)
+            widget.deleteLater()
+        self.current_widgets.clear()
+
+    def remove_excess_widgets(self, row_number, col_number, max_columns):
+        for index in range(row_number * max_columns + col_number, self.grid_layout.count()):
+            layout_item = self.grid_layout.itemAt(index)
+            if layout_item is not None:
+                widget = layout_item.widget()
+                if widget:
+                    self.grid_layout.removeWidget(widget)
+                    widget.deleteLater()
+
+    def resizeEvent(self, event):
+        self.populate()  # 重新排列图片和按钮
+        super().resizeEvent(event)
+
+    def setup_connections(self):
+        pass
+
+    def calculate_dynamic_padding(self):
+        # 根据窗口大小计算动态内边距，这里只是一个基本示例
+        window_width = self.width()
+        if window_width < 800:  # 小窗口
+            return 5, 5
+        elif window_width < 1200:  # 中等窗口
+            return 10, 10
+        else:  # 大窗口
+            return 15, 15
+
+    def delete_db_entry(self, image_hash):
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM image_ppt_mapping WHERE `Image Hash`=?", (image_hash,))
+        conn.commit()
+        conn.close()
+
+    def delete_image(self, image_hash):
+        # 查找要删除的图片路径
+        img_path_to_delete = None
+        for img in self.images:
+            if img.get('Image Hash') == image_hash:  # 使用get方法来避免KeyError
+                img_path_to_delete = img.get('img_path')
+                break
+
+        # 更新内存中的images数据结构，移除对应图片
+        self.images = [img for img in self.images if img.get('Image Hash') != image_hash]
+
+        # 重新写入CSV文件
+        with open(self.csv_file_path, 'w', newline='', encoding='utf-8') as csvfile:
+            fieldnames = ['Image Hash', 'Image File', 'PPTX File']
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            for img in self.images:
+                for pptx_path in img.get('pptx_paths', []):
+                    writer.writerow({'Image Hash': img.get('Image Hash'), 'Image File': img.get('img_path'),
+                                     'PPTX File': pptx_path})
+
+        # 从文件系统中删除图片文件
+        if img_path_to_delete and os.path.exists(img_path_to_delete):
+            os.remove(img_path_to_delete)
+
+        # 重新加载界面
+        self.populate()
 
 
 class ClickableLabel(QLabel):
-    """
-    可点击的标签，用于展示图片，并提供右键菜单进行复制或删除操作。
-
-    属性:
-    - image_hash: 图片的哈希值，用于唯一标识图片。
-    - img_path: 图片的文件路径。
-    - gallery_app: 对ImageGalleryApp实例的引用，用于执行图片的删除操作。
-    """
-
-    def __init__(self, image_hash, img_path, gallery_app, parent=None):
+    def __init__(self, image_hash, img_path, parent=None):
         super().__init__(parent)
-        self.image_hash = image_hash
-        self.img_path = img_path
-        self.gallery_app = gallery_app
+        self.image_hash = image_hash  # 保存图片的哈希值或其他唯一标识
+        self.img_path = img_path  # 保存原图的路径
+        self.gallery_app = gallery_app  # 存储对ImageGalleryApp实例的引用
 
-        self.setPixmap(QPixmap(img_path).scaled(200, 200, Qt.KeepAspectRatio, Qt.SmoothTransformation))
-        self.setContextMenuPolicy(Qt.CustomContextMenu)
-        self.customContextMenuRequested.connect(self.showContextMenu)
+    def copy_to_clipboard(self):
+        # 加载原图
+        pixmap = QPixmap(self.img_path)
+        # 复制到剪贴板
+        QApplication.clipboard().setPixmap(pixmap)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.RightButton:
+            self.showContextMenu(event.pos())
+        else:
+            super().mousePressEvent(event)
 
     def showContextMenu(self, position):
-        """
-        在标签位置显示右键菜单。
-
-        输入:
-        - position: 右键点击的位置。
-
-        功能: 显示一个包含“复制图片”和“删除图片”选项的菜单。
-        """
-        menu = QMenu(self)
+        menu = QMenu()
         copy_action = menu.addAction("复制图片")
         delete_action = menu.addAction("删除图片")
         action = menu.exec_(self.mapToGlobal(position))
-
         if action == copy_action:
             self.copy_to_clipboard()
         elif action == delete_action:
-            self.confirm_delete()
+            self.deleteImage()
 
-    def copy_to_clipboard(self):
-        """
-        将图片复制到剪贴板。
-
-        功能: 加载图片并复制到系统剪贴板。不需要输入和输出。
-        """
-        clipboard = QApplication.clipboard()
-        clipboard.setPixmap(QPixmap(self.img_path))
-
-    def confirm_delete(self):
-        """
-        确认是否删除图片。
-
-        功能: 弹出确认对话框，若确认则调用ImageGalleryApp实例删除图片。不需要输入和输出。
-        """
-        reply = QMessageBox.question(self, '删除确认', "你确定要删除这张图片吗？",
-                                     QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+    def deleteImage(self):
+        reply = QMessageBox.question(self, '删除确认', "你确定要删除这张图片吗？", QMessageBox.Yes | QMessageBox.No,
+                                     QMessageBox.No)
         if reply == QMessageBox.Yes:
-            self.gallery_app.delete_image(self.image_hash)
+            self.gallery_app.delete_db_entry(self.image_hash)  # 通过gallery_app引用调用方法
+
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    gallery_app = ImageGalleryApp("image_gallery.db")
+    gallery_app.show()
+    sys.exit(app.exec_())

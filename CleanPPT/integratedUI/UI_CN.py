@@ -4,9 +4,9 @@ from tkinter import messagebox, Button
 import win32com.client
 import win32com.client
 
-from clean_graph import adjust_text_boxes
-from extract_slides import extract_text_from_presentation
-from clean_master import clean_master_in_open_presentation
+from modules.clean_graph import adjust_text_boxes
+from modules.extract_slides import extract_text_from_presentation
+from modules import clean_master_in_open_presentation
 
 app = tk.Tk()
 app.title("PPTX Toolkit")

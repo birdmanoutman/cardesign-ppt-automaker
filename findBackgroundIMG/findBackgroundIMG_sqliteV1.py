@@ -1,4 +1,11 @@
-# findBackgroundIMG_V3.py
+"""这段代码是一个用于处理PPTX文件中的图片的Python脚本，名为findBackgroundIMG_V3.py。
+SQLiteManager 负责数据库操作，ImageManager 负责图片的去重和保存逻辑，并与数据库交互。
+ImageExtractor 负责从PPTX文件中提取图片，并通过 ImageManager 来处理这些图片。
+ImageProcessor 作为协调者，初始化并连接了上述类的实例，定义了处理流程。
+main 函数作为程序的启动点，配置并运行 ImageProcessor。
+这种设计体现了关注点分离的原则，通过分离数据访问层、业务逻辑层和表示层，提高了代码的可维护性和可扩展性。"""
+
+# findBackgroundIMG_sqliteV1.py
 import io
 import logging
 import os
@@ -40,7 +47,8 @@ class SQLiteManager:
                 id INTEGER PRIMARY KEY,
                 img_hash TEXT UNIQUE,
                 img_path TEXT,
-                pptx_path TEXT
+                pptx_path TEXT,
+                is_duplicate INT
             )'''
         try:
             self.cursor.execute(table_sql)
@@ -55,11 +63,15 @@ class SQLiteManager:
             df = pd.read_csv(csv_file_path)
             for _, row in df.iterrows():
                 img_hash = row['Image Hash']
-                img_path = row['Image Path']
-                pptx_path = row['PPTX Path']
+                img_path = row['Image File']
+                pptx_path = row['PPTX File']
+                is_duplicate = row['Is Duplicate']
                 self.cursor.execute(
-                    f'INSERT INTO {table_name} (img_hash, img_path, pptx_path) VALUES (?, ?, ?) ON CONFLICT(img_hash) DO REPLACE',
-                    (img_hash, img_path, pptx_path))
+                    f'INSERT INTO {table_name} (img_hash, img_path, pptx_path, is_duplicate) VALUES (?, ?, ?,?'
+                    f') ON CONFLICT('
+                    f'img_hash) DO UPDATE SET img_path=excluded.img_path, pptx_path=excluded.pptx_path',
+                    (img_hash, img_path, pptx_path, is_duplicate))
+
             self.conn.commit()
             logging.info("CSV import completed.")
         except Exception as e:
@@ -97,6 +109,7 @@ class ImageManager:
     功能：负责检查图片是否为重复图片（通过图片的哈希值），保存新的图片到指定文件夹，并更新数据库中的记录。
     与其他对象的关系：依赖 SQLiteManager 类来执行数据库操作，由 ImageExtractor 类调用来处理具体的图片保存逻辑。
     """
+
     def __init__(self, db_manager, table_name):
         self.db_manager = db_manager
         self.table_name = table_name
@@ -124,6 +137,7 @@ class ImageExtractor:
     功能：遍历指定源文件夹中的所有PPTX文件，提取每个演示文稿中的图片，并处理每张图片。
     与其他对象的关系：使用 ImageManager 类来处理图片的保存和数据库记录更新。它是图片提取过程的起点，负责具体的图片提取逻辑。
     """
+
     def __init__(self, src_folder, dest_folder, image_manager):
         self.src_folder = src_folder
         self.dest_folder = dest_folder
@@ -158,6 +172,7 @@ class ImageProcessor:
     功能：这是整个脚本的核心类，负责初始化数据库管理器、图片管理器和图片提取器。它设置了整个图片处理流程的参数，如源文件夹、目标文件夹、数据库路径、CSV文件路径和数据库表名，并触发图片提取和处理过程。
     与其他对象的关系：它实例化了 SQLiteManager, ImageManager, 和 ImageExtractor 类，并通过它们协同工作完成整个图片处理流程。
     """
+
     def __init__(self, db_path, src_folder, dest_folder, csv_file_path, table_name):
         self.db_path = db_path
         self.src_folder = src_folder
@@ -185,19 +200,20 @@ class ImageProcessor:
 
 
 def main():
-    """
-    功能：设定脚本的运行参数，创建 ImageProcessor 类的实例，并启动图片处理流程。
-    与其他对象的关系：是脚本执行的入口点，通过实例化 ImageProcessor 类来启动整个图片处理过程。
-    """
-    # Adjust these parameters according to your setup
-    src_folder = "your_source_folder"
-    dest_folder = "your_destination_folder"
-    db_path = "your_database_file.db"
-    csv_file_path = "your_csv_file_path.csv"
-    table_name = "your_table_name"
+    # 已知参数
+    db_path = "image_gallery.db"  # 数据库文件路径
+    table_name = "image_ppt_mapping"  # 数据库表名
+    csv_file_path = r"D:\PycharmProjects\cardesign-ppt-automaker\findBackgroundIMG\source\image_ppt_mapping.csv"  #
+    # CSV文件路径
 
-    image_processor = ImageProcessor(db_path, src_folder, dest_folder, csv_file_path, table_name)
-    image_processor.run()
+    # 首次迁移CSV数据
+    # 1. 初始化数据库管理器并连接数据库
+    db_manager = SQLiteManager(db_path)
+    db_manager.connect()
+    # 2. 创建表（如果尚不存在）
+    db_manager.create_table(table_name)
+    # 3. 从CSV文件导入数据
+    db_manager.import_csv_to_database(csv_file_path, table_name)
 
 
 if __name__ == "__main__":

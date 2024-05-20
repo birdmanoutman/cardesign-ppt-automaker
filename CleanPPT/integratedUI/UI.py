@@ -3,10 +3,10 @@ from tkinter import messagebox, Button, filedialog, Checkbutton, IntVar
 import win32com.client
 
 # Import custom modules
-from clean_graph import adjust_text_boxes
-from clean_master import clean_master_in_open_presentation
-from extract_slides import extract_text_from_presentation
-from standardize_filename_v6 import standardize_filename_v6
+from modules.clean_graph import adjust_text_boxes
+from modules import clean_master_in_open_presentation
+from modules.extract_slides import extract_text_from_presentation
+from modules.standardize_filename_v7 import standardize_filename
 
 def main():
     app = tk.Tk()
@@ -91,7 +91,7 @@ def main():
 
         Checkbutton(file_frame, text="文件名添加默认日期", variable=add_date).pack()
         Checkbutton(file_frame, text="重命名文件夹", variable=rename_folders).pack()
-        Button(file_frame, text="标准化文件名", command=lambda: standardize_filename_v6(folder_path.get(), add_date.get(), rename_folders.get())).pack(pady=10)
+        Button(file_frame, text="标准化文件名", command=lambda: standardize_filename(folder_path.get(), add_date.get(), rename_folders.get())).pack(pady=10)
 
     # 文本提取和调整按钮
     Button(button_frame, text="从PPTX提取文本", command=lambda: open_ppt_selection_window('extract')).pack(pady=10, anchor='w')
