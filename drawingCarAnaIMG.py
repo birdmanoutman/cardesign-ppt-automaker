@@ -12,7 +12,7 @@ from matplotlib.font_manager import FontProperties
 df = pd.read_excel('carPriceAndSeg/mpv_data_with_images.xlsx')
 
 # Update the 'Image_Path' column in the DataFrame with the correct paths
-df['Image_Path'] = df['Image_Path'].apply(lambda x: os.path.join('carPriceAndSeg/car-pic', os.path.basename(x)))
+df['Image_Path'] = df['Image_Path'].apply(lambda x: os.path.join('modules/carPriceAndSeg/car-pic', os.path.basename(x)))
 
 
 # Function to resize an image
