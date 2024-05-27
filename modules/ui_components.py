@@ -1,3 +1,4 @@
+# ui_components.py
 import os
 import sys
 import tkinter as tk
@@ -57,9 +58,12 @@ class PPTXToolUI:
 
         self.text_output.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
 
-        self.create_button(button_frame, "从PPTX提取文本", lambda: self.file_operations.open_ppt_selection_window('extract', self))
-        self.create_button(button_frame, "调整文本框", lambda: self.file_operations.open_ppt_selection_window('adjust', self))
-        self.create_button(button_frame, "清理PPTX母版", lambda: self.file_operations.open_ppt_selection_window('clean_master', self))
+        self.create_button(button_frame, "从PPTX提取文本",
+                           lambda: self.file_operations.open_ppt_selection_window('extract', self))
+        self.create_button(button_frame, "调整文本框",
+                           lambda: self.file_operations.open_ppt_selection_window('adjust', self))
+        self.create_button(button_frame, "清理PPTX母版",
+                           lambda: self.file_operations.open_ppt_selection_window('clean_master', self))
         self.create_button(button_frame, "重命名目录下的文件", self.open_rename_files_window)
 
     def create_frame(self, parent, **kwargs):
@@ -83,8 +87,10 @@ class PPTXToolUI:
         file_frame = self.create_frame(top)
         file_frame.pack(fill=tk.BOTH, expand=True)
 
-        Checkbutton(file_frame, text="文件名添加默认日期", variable=self.add_date, command=self.refresh_file_list).pack(anchor='w')
-        Checkbutton(file_frame, text="重命名文件夹", variable=self.rename_folders, command=self.refresh_file_list).pack(anchor='w')
+        Checkbutton(file_frame, text="文件名添加默认日期", variable=self.add_date, command=self.refresh_file_list).pack(
+            anchor='w')
+        Checkbutton(file_frame, text="重命名文件夹", variable=self.rename_folders, command=self.refresh_file_list).pack(
+            anchor='w')
 
         self.create_file_list_canvas(file_frame)
         self.button_frame = tk.Frame(top)  # 定义 button_frame
@@ -129,8 +135,13 @@ class PPTXToolUI:
 
         self.canvas.bind_all("<MouseWheel>", self.on_mouse_wheel)
 
+
     def on_mouse_wheel(self, event):
-        self.canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+        try:
+            if self.canvas.winfo_exists():
+                self.canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+        except Exception as e:
+            print(f"Error during mouse wheel scroll: {e}")
 
     def open_folder_dialog(self):
         folder_selected = filedialog.askdirectory()
@@ -205,7 +216,8 @@ class PPTXToolUI:
         row_frame = tk.Frame(parent)
         row_frame.grid(row=index + 1, column=0, sticky='nsew', pady=5)
 
-        checkbutton = Checkbutton(row_frame, variable=var, width=10, command=lambda: self.on_file_var_check(var, orig_name, std_name_var))
+        checkbutton = Checkbutton(row_frame, variable=var, width=10,
+                                  command=lambda: self.on_file_var_check(var, orig_name, std_name_var))
         checkbutton.grid(row=0, column=0, padx=2)
         thumbnail_label = tk.Label(row_frame, width=50, height=50)
         self.set_thumbnail(original_path, thumbnail_label)
@@ -238,19 +250,25 @@ class PPTXToolUI:
             self.list_files_and_folders(path)
         elif path.lower().endswith('.lnk'):
             target = self.resolve_shortcut(path)
-            if target:
+            if target and os.path.exists(target):
                 self.handle_file_or_folder_click(target)
             else:
+                print(f"Invalid shortcut target: {target}")
                 self.file_operations.open_file(path)
         else:
             self.file_operations.open_file(path)
 
     def resolve_shortcut(self, path):
-        pythoncom.CoInitialize()
-        shell = win32com.client.Dispatch("WScript.Shell")
-        shortcut = shell.CreateShortCut(path)
-        target = shortcut.Targetpath
-        pythoncom.CoUninitialize()
+        try:
+            pythoncom.CoInitialize()
+            shell = win32com.client.Dispatch("WScript.Shell")
+            shortcut = shell.CreateShortCut(path)
+            target = shortcut.Targetpath
+        except Exception as e:
+            print(f"Failed to resolve shortcut for {path}: {e}")
+            target = None
+        finally:
+            pythoncom.CoUninitialize()
         return target
 
     def navigate_back(self):
@@ -298,7 +316,8 @@ class PPTXToolUI:
 
     def update_navigation_state(self):
         self.btn_back.config(state=tk.NORMAL if self.navigation_index > 0 else tk.DISABLED)
-        self.btn_forward.config(state=tk.NORMAL if self.navigation_index < len(self.navigation_history) - 1 else tk.DISABLED)
+        self.btn_forward.config(
+            state=tk.NORMAL if self.navigation_index < len(self.navigation_history) - 1 else tk.DISABLED)
         self.path_entry.set(self.navigation_history[self.navigation_index])
 
     def rename_files(self):

@@ -1,3 +1,4 @@
+# file_operations.py
 import ctypes
 import os
 import re
@@ -59,22 +60,22 @@ class FileOperations:
             # Date extraction and formatting
             date_match = full_date_pattern.search(normalized_name)
             if date_match:
-                date_str = datetime.strptime(date_match.group(), '%Y%m%d').strftime('%y%m%d')
+                date_str = datetime.strptime(date_match.group(), '%Y%m%d').strftime('%Y%m%d')
                 normalized_name = full_date_pattern.sub('', normalized_name)
             else:
                 date_match = short_date_pattern.search(normalized_name)
                 if date_match:
-                    date_str = last_modified_date.strftime('%y') + date_match.group()
+                    date_str = last_modified_date.strftime('%Y') + date_match.group()
                     normalized_name = short_date_pattern.sub('', normalized_name)
                 else:
                     cn_date_match = cn_date_pattern.search(normalized_name)
                     if cn_date_match:
                         month_day_str = datetime.strptime(f'{cn_date_match.group(1)}{cn_date_match.group(2)}',
                                                           '%m%d').strftime('%m%d')
-                        date_str = last_modified_date.strftime('%y') + month_day_str
+                        date_str = last_modified_date.strftime('%Y') + month_day_str
                         normalized_name = cn_date_pattern.sub('', normalized_name)
                     elif add_default_date:
-                        date_str = last_modified_date.strftime('%y%m%d')
+                        date_str = last_modified_date.strftime('%Y%m%d')
                     else:
                         continue  # Skip renaming if no date found and default date not allowed
 

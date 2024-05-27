@@ -14,24 +14,15 @@ class ImageGalleryApp(QWidget):
     def __init__(self, db_path):
         super().__init__()
         self.setWindowTitle("Image Gallery")
-        self.db_path = db_path  # SQLite数据库的路径
+        self.db_path = db_path
         self.images = self.load_images_from_db()
 
-        # 获取屏幕尺寸，调整窗口大小
         screen_size = QApplication.instance().primaryScreen().size()
         self.resize(int(screen_size.width() * 0.8), int(screen_size.height() * 0.8))
         self.create_ui()
         self.setup_connections()
-        self.pixmap_cache = {}  # 图片缓存
-        self.current_widgets = []  # 当前显示的部件列表
-
-    @staticmethod
-    def clear_layout(layout):
-        for i in reversed(range(layout.count())):
-            widget = layout.itemAt(i).widget()
-            if widget is not None:
-                layout.removeWidget(widget)
-                widget.deleteLater()
+        self.pixmap_cache = {}
+        self.current_widgets = []
 
     def create_ui(self):
         self.scroll_area = QScrollArea(self)
@@ -39,29 +30,28 @@ class ImageGalleryApp(QWidget):
         self.container = QWidget()
         self.grid_layout = QGridLayout(self.container)
         self.container.setLayout(self.grid_layout)
-        self.scroll_area.setWidget(self.container)
         layout = QVBoxLayout(self)
         layout.addWidget(self.scroll_area)
+        self.scroll_area.setWidget(self.container)
         self.setLayout(layout)
 
-    def clear_layout_placeholders(self, layout):
+    def clear_layout(self, layout):
         for i in reversed(range(layout.count())):
             widget = layout.itemAt(i).widget()
-            if isinstance(widget, QWidget) and widget not in self.current_widgets:
+            if widget is not None:
                 layout.removeWidget(widget)
                 widget.deleteLater()
 
     def update_widget_with_image_data(self, vertical_layout, image_data):
         img_path = image_data['img_path']
         pptx_paths = image_data['pptx_paths']
-        img_hash = image_data.get('img_hash')  # 假设image_data字典中有img_hash这一项
+        img_hash = image_data.get('img_hash')
 
-        # 创建或更新ClickableLabel时，现在还需要传递img_path
         if vertical_layout.count() > 0:
             label = vertical_layout.itemAt(0).widget()
             if not isinstance(label, ClickableLabel):
-                label.deleteLater()  # 删除原有的Label
-                label = ClickableLabel(img_hash, img_path, self)  # 创建新的ClickableLabel并传递img_path
+                label.deleteLater()
+                label = ClickableLabel(img_hash, img_path, self)
                 vertical_layout.insertWidget(0, label)
         else:
             label = ClickableLabel(img_hash, img_path, self)
@@ -69,7 +59,6 @@ class ImageGalleryApp(QWidget):
 
         label.image_hash = img_hash
 
-        # 检查图片缓存，更新或添加图片
         if img_path not in self.pixmap_cache:
             pixmap = QPixmap(img_path).scaled(200, 200, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             self.pixmap_cache[img_path] = pixmap
@@ -77,38 +66,28 @@ class ImageGalleryApp(QWidget):
             pixmap = self.pixmap_cache[img_path]
         label.setPixmap(pixmap)
 
-        # 获取图片宽度用于后续按钮宽度调整
         image_width = pixmap.width()
 
-        # 确保所有旧的按钮被清除，除了图片标签以外
         while vertical_layout.count() > 1:
             widget_to_remove = vertical_layout.itemAt(1).widget()
             vertical_layout.removeWidget(widget_to_remove)
             widget_to_remove.deleteLater()
 
-        # 添加新的PPTX按钮
         for pptx_path in pptx_paths:
             pptx_btn_text = os.path.basename(pptx_path)
-            # 检查文本长度，并在必要时调整它
             if len(pptx_btn_text) > 20:
                 pptx_btn_text = pptx_btn_text[:9] + "..." + pptx_btn_text[-7:]
             pptx_btn = QPushButton(pptx_btn_text)
             pptx_btn.clicked.connect(lambda checked, path=pptx_path: open_pptx(path))
-            pptx_btn.setFixedWidth(image_width)  # 设置按钮宽度与图片宽度一致
+            pptx_btn.setFixedWidth(image_width)
             vertical_layout.addWidget(pptx_btn)
-
-    def show_event(self, event):
-        super().showEvent(event)
-        self.populate()  # 确保窗口显示后填充元素
 
     def load_images_from_db(self):
         images = {}
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        # 如果您只对某些列感兴趣，显式指定这些列，而不是使用*
         cursor.execute("SELECT img_hash, img_path, pptx_path, is_duplicate FROM image_ppt_mapping")
         for row in cursor.fetchall():
-            # 确保包括所有从数据库检索的列
             img_hash, img_path, pptx_path, is_duplicate = row
             if img_path.lower().endswith(('.png', '.jpg', '.jpeg')):
                 if QImage(img_path).isNull() or is_duplicate:
@@ -123,9 +102,9 @@ class ImageGalleryApp(QWidget):
         return list(images.values())
 
     def calculate_columns(self):
-        container_width = self.scroll_area.width()  # 获取滚动区域的当前宽度
-        item_width = 250  # 假设每个图片加上内边距等需要的宽度
-        columns = max(1, container_width // item_width)  # 计算可以容纳的列数，至少为1
+        container_width = self.scroll_area.width()
+        item_width = 250
+        columns = max(1, container_width // item_width)
         return columns
 
     def populate(self):
@@ -171,69 +150,43 @@ class ImageGalleryApp(QWidget):
                     widget.deleteLater()
 
     def resizeEvent(self, event):
-        self.populate()  # 重新排列图片和按钮
+        self.populate()
         super().resizeEvent(event)
 
     def setup_connections(self):
         pass
 
-    def calculate_dynamic_padding(self):
-        # 根据窗口大小计算动态内边距，这里只是一个基本示例
-        window_width = self.width()
-        if window_width < 800:  # 小窗口
-            return 5, 5
-        elif window_width < 1200:  # 中等窗口
-            return 10, 10
-        else:  # 大窗口
-            return 15, 15
-
     def delete_db_entry(self, image_hash):
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        cursor.execute("DELETE FROM image_ppt_mapping WHERE `Image Hash`=?", (image_hash,))
+        cursor.execute("DELETE FROM image_ppt_mapping WHERE img_hash=?", (image_hash,))
         conn.commit()
         conn.close()
 
     def delete_image(self, image_hash):
-        # 查找要删除的图片路径
         img_path_to_delete = None
         for img in self.images:
-            if img.get('Image Hash') == image_hash:  # 使用get方法来避免KeyError
+            if img.get('img_hash') == image_hash:
                 img_path_to_delete = img.get('img_path')
                 break
 
-        # 更新内存中的images数据结构，移除对应图片
-        self.images = [img for img in self.images if img.get('Image Hash') != image_hash]
+        self.images = [img for img in self.images if img.get('img_hash') != image_hash]
 
-        # 重新写入CSV文件
-        with open(self.csv_file_path, 'w', newline='', encoding='utf-8') as csvfile:
-            fieldnames = ['Image Hash', 'Image File', 'PPTX File']
-            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-            writer.writeheader()
-            for img in self.images:
-                for pptx_path in img.get('pptx_paths', []):
-                    writer.writerow({'Image Hash': img.get('Image Hash'), 'Image File': img.get('img_path'),
-                                     'PPTX File': pptx_path})
-
-        # 从文件系统中删除图片文件
         if img_path_to_delete and os.path.exists(img_path_to_delete):
             os.remove(img_path_to_delete)
 
-        # 重新加载界面
         self.populate()
 
 
 class ClickableLabel(QLabel):
     def __init__(self, image_hash, img_path, parent=None):
         super().__init__(parent)
-        self.image_hash = image_hash  # 保存图片的哈希值或其他唯一标识
-        self.img_path = img_path  # 保存原图的路径
-        self.gallery_app = gallery_app  # 存储对ImageGalleryApp实例的引用
+        self.image_hash = image_hash
+        self.img_path = img_path
+        self.parent = parent
 
     def copy_to_clipboard(self):
-        # 加载原图
         pixmap = QPixmap(self.img_path)
-        # 复制到剪贴板
         QApplication.clipboard().setPixmap(pixmap)
 
     def mousePressEvent(self, event):
@@ -256,7 +209,7 @@ class ClickableLabel(QLabel):
         reply = QMessageBox.question(self, '删除确认', "你确定要删除这张图片吗？", QMessageBox.Yes | QMessageBox.No,
                                      QMessageBox.No)
         if reply == QMessageBox.Yes:
-            self.gallery_app.delete_db_entry(self.image_hash)  # 通过gallery_app引用调用方法
+            self.parent.delete_db_entry(self.image_hash)
 
 
 if __name__ == "__main__":

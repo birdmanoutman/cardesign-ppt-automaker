@@ -1,3 +1,4 @@
+# utils/thumbnail_generator.py
 import os
 import tempfile
 from PIL import Image, ImageTk, ImageOps
@@ -29,12 +30,15 @@ class ThumbnailGenerator:
             img = ImageTk.PhotoImage(file=temp_file)
             label.config(image=img, text='', width=50, height=50)
             label.image = img
-        except Exception:
+        except Exception as e:
+            print(f"Error generating image thumbnail for {filepath}: {e}")
             self.set_no_preview(label)
 
     def generate_pdf_thumbnail(self, filepath, label):
         try:
             doc = fitz.open(filepath)
+            if doc.is_encrypted:
+                doc.authenticate('')  # 如果文件有密码，可以在这里处理密码输入逻辑
             page = doc.load_page(0)
             pix = page.get_pixmap()
             img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
@@ -45,7 +49,11 @@ class ThumbnailGenerator:
             img = ImageTk.PhotoImage(file=temp_file)
             label.config(image=img, text='', width=50, height=50)
             label.image = img
-        except Exception:
+        except ValueError as e:
+            print(f"MuPDF error processing {filepath}: {e}")
+            self.set_no_preview(label)
+        except Exception as e:
+            print(f"Error generating PDF thumbnail for {filepath}: {e}")
             self.set_no_preview(label)
 
     def set_no_preview(self, label):
