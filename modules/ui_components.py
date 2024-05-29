@@ -135,7 +135,6 @@ class PPTXToolUI:
 
         self.canvas.bind_all("<MouseWheel>", self.on_mouse_wheel)
 
-
     def on_mouse_wheel(self, event):
         try:
             if self.canvas.winfo_exists():
