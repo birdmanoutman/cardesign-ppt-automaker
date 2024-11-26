@@ -1,3 +1,4 @@
+# app.py
 import tkinter as tk
 from modules.ui_components import PPTXToolUI
 
